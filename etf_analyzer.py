@@ -3,12 +3,11 @@ ETF Holdings Analyzer
 Analyze ETF holdings data from CSV files using pandas
 """
 
-import pandas as pd
-import numpy as np
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, Dict, List
+
+import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 
 
 class ETFAnalyzer:
@@ -143,7 +142,7 @@ class ETFAnalyzer:
         print(f"Analysis exported to {output_path}")
 
 
-def compare_etfs(etf_paths: List[str], weight_column: str = 'weight') -> pd.DataFrame:
+def compare_etfs(etf_paths: List[str], weight_column: str = 'weight') -> Dict[str, Optional[pd.DataFrame]]:
     """
     Compare multiple ETFs side by side
 

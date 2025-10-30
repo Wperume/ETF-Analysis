@@ -30,8 +30,9 @@ wheels/
 *.swo
 *~
 
-# Data files (if you want to ignore large CSV files)
-# data/*.csv
+# Data files - ignore all files in data directory but keep the directory
+data/*
+!data/.gitkeep
 
 # Jupyter Notebook
 .ipynb_checkpoints

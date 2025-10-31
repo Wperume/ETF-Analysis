@@ -34,13 +34,10 @@ class ETFAnalyzer:
         Returns:
             Loaded DataFrame
         """
-        try:
-            self.df = pd.read_csv(self.csv_path, **kwargs)
-            print(f"Loaded {len(self.df)} holdings from {self.csv_path.name}")
-            return self.df
-        except Exception as e:
-            print(f"Error loading CSV: {e}")
-            raise
+        df = pd.read_csv(self.csv_path, **kwargs)
+        self.df = df
+        print(f"Loaded {len(df)} holdings from {self.csv_path.name}")
+        return df
 
     def get_summary_stats(self) -> Dict:
         """
@@ -52,13 +49,16 @@ class ETFAnalyzer:
         if self.df is None:
             raise ValueError("Data not loaded. Call load_data() first.")
 
+        memory_kb = self.df.memory_usage(deep=True).sum() / 1024
         return {
-            'total_holdings': len(self.df),
-            'columns': list(self.df.columns),
-            'memory_usage': f"{self.df.memory_usage(deep=True).sum() / 1024:.2f} KB"
+            "total_holdings": len(self.df),
+            "columns": list(self.df.columns),
+            "memory_usage": f"{memory_kb:.2f} KB",
         }
 
-    def get_top_holdings(self, n: int = 10, weight_column: str = 'weight') -> pd.DataFrame:
+    def get_top_holdings(
+        self, n: int = 10, weight_column: str = "weight"
+    ) -> pd.DataFrame:
         """
         Get the top N holdings by weight
 
@@ -73,11 +73,13 @@ class ETFAnalyzer:
             raise ValueError("Data not loaded. Call load_data() first.")
 
         if weight_column not in self.df.columns:
-            raise ValueError(f"Column '{weight_column}' not found in DataFrame")
+            raise ValueError(
+                f"Column '{weight_column}' not found in DataFrame"
+            )
 
         return self.df.nlargest(n, weight_column)
 
-    def analyze_by_sector(self, sector_column: str = 'sector') -> pd.DataFrame:
+    def analyze_by_sector(self, sector_column: str = "sector") -> pd.DataFrame:
         """
         Analyze holdings grouped by sector
 
@@ -91,16 +93,24 @@ class ETFAnalyzer:
             raise ValueError("Data not loaded. Call load_data() first.")
 
         if sector_column not in self.df.columns:
-            raise ValueError(f"Column '{sector_column}' not found in DataFrame")
+            raise ValueError(
+                f"Column '{sector_column}' not found in DataFrame"
+            )
 
-        sector_analysis = self.df.groupby(sector_column).agg({
-            sector_column: 'count'
-        }).rename(columns={sector_column: 'count'})
+        sector_analysis = (
+            self.df.groupby(sector_column)
+            .agg({sector_column: "count"})
+            .rename(columns={sector_column: "count"})
+        )
 
-        return sector_analysis.sort_values('count', ascending=False)
+        return sector_analysis.sort_values("count", ascending=False)
 
-    def plot_top_holdings(self, n: int = 10, weight_column: str = 'weight',
-                         name_column: str = 'name'):
+    def plot_top_holdings(
+        self,
+        n: int = 10,
+        weight_column: str = "weight",
+        name_column: str = "name",
+    ):
         """
         Plot a bar chart of top N holdings
 
@@ -116,33 +126,40 @@ class ETFAnalyzer:
 
         plt.figure(figsize=(12, 6))
         plt.barh(range(len(top_holdings)), top_holdings[weight_column])
-        plt.yticks(range(len(top_holdings)), top_holdings[name_column])
-        plt.xlabel('Weight (%)')
-        plt.title(f'Top {n} Holdings - {self.etf_name}')
+        plt.yticks(
+            range(len(top_holdings)), top_holdings[name_column].tolist()
+        )
+        plt.xlabel("Weight (%)")
+        plt.title(f"Top {n} Holdings - {self.etf_name}")
         plt.gca().invert_yaxis()
         plt.tight_layout()
         plt.show()
 
-    def export_analysis(self, output_path: str, analysis_type: str = 'summary'):
+    def export_analysis(
+        self, output_path: str, analysis_type: str = "summary"
+    ):
         """
         Export analysis results to a file
 
         Args:
             output_path: Path to save the output file
-            analysis_type: Type of analysis to export ('summary', 'top_holdings', etc.)
+            analysis_type: Type of analysis to export
+                ('summary', 'top_holdings', etc.)
         """
-        output_path = Path(output_path)
+        output_file = Path(output_path)
 
-        if analysis_type == 'summary':
+        if analysis_type == "summary":
             stats = self.get_summary_stats()
-            with open(output_path, 'w') as f:
+            with open(output_file, "w") as f:
                 for key, value in stats.items():
                     f.write(f"{key}: {value}\n")
 
-        print(f"Analysis exported to {output_path}")
+        print(f"Analysis exported to {output_file}")
 
 
-def compare_etfs(etf_paths: List[str], weight_column: str = 'weight') -> Dict[str, Optional[pd.DataFrame]]:
+def compare_etfs(
+    etf_paths: List[str], weight_column: str = "weight"
+) -> Dict[str, Optional[pd.DataFrame]]:
     """
     Compare multiple ETFs side by side
 
@@ -172,10 +189,10 @@ if __name__ == "__main__":
     # Create an example of how to use the analyzer
     example_path = "data/sample_etf.csv"
 
-    print(f"\nTo use this analyzer:")
-    print(f"1. Place your ETF CSV files in the 'data/' directory")
-    print(f"2. Run the following code:\n")
+    print("\nTo use this analyzer:")
+    print("1. Place your ETF CSV files in the 'data/' directory")
+    print("2. Run the following code:\n")
     print(f"analyzer = ETFAnalyzer('{example_path}')")
-    print(f"analyzer.load_data()")
-    print(f"print(analyzer.get_summary_stats())")
-    print(f"print(analyzer.get_top_holdings(10))")
+    print("analyzer.load_data()")
+    print("print(analyzer.get_summary_stats())")
+    print("print(analyzer.get_top_holdings(10))")

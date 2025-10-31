@@ -478,6 +478,106 @@ class TestETFPortfolioAnalyzer:
         # Should have exactly 3 valid symbols
         assert len(unique) == 3
 
+    def test_get_assets_with_etf_list(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test getting assets with ETF list sorted by symbol"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        result = portfolio.get_assets_with_etf_list(
+            symbol_col="ticker", name_col="name"
+        )
+
+        # Check result structure
+        assert "Symbol" in result.columns
+        assert "Name" in result.columns
+        assert "ETF_Count" in result.columns
+        assert "ETFs" in result.columns
+
+        # Check that it's sorted by Symbol ascending
+        assert list(result["Symbol"]) == sorted(result["Symbol"].tolist())
+
+        # Each asset should appear only once
+        assert len(result) == result["Symbol"].nunique()
+
+        # Verify data content
+        assert len(result) == 8  # 5 from SPY + 3 from QQQ
+        assert "AAPL" in result["Symbol"].values
+        assert "NVDA" in result["Symbol"].values
+
+    def test_export_asset_analysis_by_symbol(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test exporting asset analysis sorted by symbol"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "assets_by_symbol.csv"
+        portfolio.export_asset_analysis(
+            str(output_file),
+            sort_by="symbol",
+            symbol_col="ticker",
+            name_col="name",
+        )
+
+        # Check file was created
+        assert output_file.exists()
+
+        # Read the file back and verify structure
+        result = pd.read_csv(output_file)
+        assert "Symbol" in result.columns
+        assert "Name" in result.columns
+        assert "ETF_Count" in result.columns
+        assert "ETFs" in result.columns
+
+        # Verify it's sorted by symbol
+        assert list(result["Symbol"]) == sorted(result["Symbol"].tolist())
+
+        # Check that comma-separated ETF lists are preserved
+        assert len(result) == 8
+
+    def test_export_asset_analysis_by_etf_count(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test exporting asset analysis sorted by ETF count"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "assets_by_etf_count.csv"
+        portfolio.export_asset_analysis(
+            str(output_file),
+            sort_by="etf_count",
+            symbol_col="ticker",
+            name_col="name",
+        )
+
+        # Check file was created
+        assert output_file.exists()
+
+        # Read the file back and verify structure
+        result = pd.read_csv(output_file)
+        assert "Symbol" in result.columns
+        assert "ETF_Count" in result.columns
+
+        # Verify it's sorted by ETF_Count descending
+        assert result["ETF_Count"].is_monotonic_decreasing
+
+    def test_export_asset_analysis_invalid_sort_by(
+        self, temp_data_dir, spy_csv_file
+    ):
+        """Test that invalid sort_by raises error"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "output.csv"
+        with pytest.raises(
+            ValueError, match="sort_by must be 'symbol' or 'etf_count'"
+        ):
+            portfolio.export_asset_analysis(
+                str(output_file), sort_by="invalid"
+            )
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

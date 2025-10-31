@@ -467,6 +467,85 @@ class ETFPortfolioAnalyzer:
 
         return result_df
 
+    def get_assets_with_etf_list(
+        self, symbol_col: str = "Symbol", name_col: str = "Name"
+    ) -> pd.DataFrame:
+        """
+        Get all assets with their ETF associations, sorted by symbol
+
+        Args:
+            symbol_col: Name of the asset symbol column
+            name_col: Name of the asset name column
+
+        Returns:
+            DataFrame with columns: Symbol, Name, ETF_Count, ETFs
+            Sorted alphabetically by Symbol
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_all_etfs() first.")
+
+        # Get the mapping
+        mapping = self.get_asset_to_etf_mapping(symbol_col)
+
+        # Build result DataFrame
+        results = []
+        for symbol, etfs in mapping.items():
+            # Get the asset name (use first occurrence)
+            asset_data = self.df[self.df[symbol_col] == symbol].iloc[0]
+            name = asset_data.get(name_col, "N/A")
+
+            results.append(
+                {
+                    "Symbol": symbol,
+                    "Name": name,
+                    "ETF_Count": len(etfs),
+                    "ETFs": ", ".join(etfs),
+                }
+            )
+
+        result_df = pd.DataFrame(results)
+        result_df = result_df.sort_values("Symbol", ascending=True)
+        result_df = result_df.reset_index(drop=True)
+
+        return result_df
+
+    def export_asset_analysis(
+        self,
+        output_path: str,
+        sort_by: str = "symbol",
+        symbol_col: str = "Symbol",
+        name_col: str = "Name",
+    ) -> None:
+        """
+        Export asset analysis to CSV file
+
+        Args:
+            output_path: Path to output CSV file
+            sort_by: Sort order - "symbol" (alphabetical) or
+                "etf_count" (by number of ETFs)
+            symbol_col: Name of the asset symbol column
+            name_col: Name of the asset name column
+
+        Raises:
+            ValueError: If sort_by is not "symbol" or "etf_count"
+        """
+        if sort_by == "symbol":
+            df = self.get_assets_with_etf_list(symbol_col, name_col)
+        elif sort_by == "etf_count":
+            df = self.get_assets_by_etf_count(symbol_col, name_col)
+        else:
+            raise ValueError(
+                f"sort_by must be 'symbol' or 'etf_count', " f"got: {sort_by}"
+            )
+
+        # Export to CSV with proper quoting for comma-separated ETF lists
+        output_file = Path(output_path)
+        df.to_csv(output_file, index=False, quoting=1)  # QUOTE_ALL
+
+        print(f"Asset analysis exported to {output_file}")
+        print(f"Total assets: {len(df)}")
+        print(f"Sort order: {sort_by}")
+
 
 def compare_etfs(
     etf_paths: List[str], weight_column: str = "weight"
@@ -541,5 +620,11 @@ if __name__ == "__main__":
         print(f"AAPL is in: {mapping['AAPL']}")
 
     # Get most common assets across all ETFs
-    print("\nMost common assets (top 10):")
+    print("\nMost common assets by ETF count (top 10):")
     print(portfolio.get_assets_by_etf_count().head(10))
+    print("\nSorted list of assets to ETFs\n")
+    print(portfolio.get_assets_with_etf_list().head(10))
+
+    # write asset to ETF info to file
+    # print("Writing sorted asset to ETF data to asset_to_ETF.csv")
+    # portfolio.export_asset_analysis("asset_to_ETF.csv", sort_by="symbol")

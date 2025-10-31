@@ -54,9 +54,17 @@ print(f"Total assets: {len(unique_symbols)}")  # e.g., 500 unique stocks
 asset_mapping = portfolio.get_asset_to_etf_mapping()
 print(asset_mapping['AAPL'])  # ['SPY', 'VOO', 'QQQ', ...]
 
-# Get most common assets across all ETFs
+# Get most common assets across all ETFs (sorted by ETF count)
 common_assets = portfolio.get_assets_by_etf_count()
 print(common_assets.head(10))  # Top 10 most held assets
+
+# Get all assets with their ETF associations (sorted alphabetically)
+assets_alphabetical = portfolio.get_assets_with_etf_list()
+print(assets_alphabetical.head(10))  # First 10 assets alphabetically
+
+# Export asset analysis to CSV file
+portfolio.export_asset_analysis('assets_by_symbol.csv', sort_by='symbol')
+portfolio.export_asset_analysis('assets_by_etf_count.csv', sort_by='etf_count')
 
 # Filter holdings by specific ETF
 spy_holdings = portfolio.filter_by_etf('SPY')

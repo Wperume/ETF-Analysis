@@ -334,6 +334,51 @@ class ETFPortfolioAnalyzer:
 
         return result
 
+    def get_unique_assets(self, symbol_col: str = "Symbol") -> List[str]:
+        """
+        Get list of all unique asset symbols across all ETFs
+
+        Args:
+            symbol_col: Name of the asset symbol column
+
+        Returns:
+            Sorted list of unique asset symbols, excluding NaN,
+            empty strings, and "n/a" values
+
+        Raises:
+            ValueError: If data not loaded or symbol column not found
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_all_etfs() first.")
+
+        if symbol_col not in self.df.columns:
+            available_cols = list(self.df.columns)
+            raise ValueError(
+                f"Column '{symbol_col}' not found in data.\n"
+                f"Available columns: {available_cols}"
+            )
+
+        # Get unique symbols
+        unique_symbols = self.df[symbol_col].unique()
+
+        # Filter out invalid values
+        valid_symbols = []
+        for symbol in unique_symbols:
+            # Skip NaN/None values
+            if pd.isna(symbol):
+                continue
+
+            # Convert to string and strip whitespace
+            symbol_str = str(symbol).strip()
+
+            # Skip empty strings and "n/a" (case insensitive)
+            if symbol_str == "" or symbol_str.lower() == "n/a":
+                continue
+
+            valid_symbols.append(symbol_str)
+
+        return sorted(valid_symbols)
+
     def get_asset_to_etf_mapping(
         self, symbol_col: str = "Symbol"
     ) -> Dict[str, List[str]]:
@@ -367,11 +412,16 @@ class ETFPortfolioAnalyzer:
             if pd.isna(asset_symbol):
                 continue
 
+            # Convert to string and check for invalid values
+            symbol_str = str(asset_symbol).strip()
+            if symbol_str == "" or symbol_str.lower() == "n/a":
+                continue
+
             # Get all ETFs that contain this asset
             etfs_with_asset = self.df[self.df[symbol_col] == asset_symbol][
                 "etf_symbol"
             ].unique()
-            asset_mapping[asset_symbol] = sorted(list(etfs_with_asset))
+            asset_mapping[symbol_str] = sorted(list(etfs_with_asset))
 
         return asset_mapping
 
@@ -477,6 +527,12 @@ if __name__ == "__main__":
     # Get assets using default column names
     print("\nVOT Assets (first 5):")
     print(portfolio.get_etf_assets("VOT").head())
+
+    # Get all unique asset symbols
+    print("\nUnique assets count:")
+    unique_assets = portfolio.get_unique_assets()
+    print(f"Total unique assets: {len(unique_assets)}")
+    print(f"First 10: {unique_assets[:10]}")
 
     # Get asset to ETF mapping
     print("\nAsset to ETF mapping (showing AAPL as example):")

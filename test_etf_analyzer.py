@@ -423,6 +423,61 @@ class TestETFPortfolioAnalyzer:
         spy_cols = portfolio.get_columns("SPY")
         assert spy_cols == all_cols  # Same structure for all ETFs
 
+    def test_get_unique_assets(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test getting unique asset symbols"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        unique = portfolio.get_unique_assets(symbol_col="ticker")
+
+        # Should be a sorted list
+        assert isinstance(unique, list)
+        assert unique == sorted(unique)
+
+        # Should contain assets from both ETFs
+        assert "AAPL" in unique  # From SPY
+        assert "NVDA" in unique  # From QQQ
+
+        # Should not contain duplicates
+        assert len(unique) == len(set(unique))
+
+    def test_get_unique_assets_filters_invalid(self, temp_data_dir):
+        """Test that invalid symbols are filtered out"""
+        # Create a CSV with invalid symbols
+        import pandas as pd
+
+        data = pd.DataFrame(
+            {
+                "ticker": ["AAPL", "n/a", "MSFT", "", "N/A", None, "GOOGL"],
+                "name": ["Apple", "NA", "Microsoft", "", "NA", None, "Google"],
+                "weight": [5.0, 0, 4.0, 0, 0, 0, 3.0],
+                "shares": [100, 0, 90, 0, 0, 0, 80],
+            }
+        )
+        csv_path = temp_data_dir / "TEST-etf-holdings.csv"
+        data.to_csv(csv_path, index=False)
+
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        unique = portfolio.get_unique_assets(symbol_col="ticker")
+
+        # Should only have valid symbols
+        assert "AAPL" in unique
+        assert "MSFT" in unique
+        assert "GOOGL" in unique
+
+        # Should not have invalid values
+        assert "n/a" not in unique
+        assert "N/A" not in unique
+        assert "" not in unique
+        assert None not in unique
+
+        # Should have exactly 3 valid symbols
+        assert len(unique) == 3
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

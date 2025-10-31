@@ -46,6 +46,10 @@ print(portfolio.get_etf_list())
 spy_assets = portfolio.get_etf_assets('SPY')
 print(spy_assets)  # Returns: Symbol, Name, Weight, Shares
 
+# Get list of all unique asset symbols
+unique_symbols = portfolio.get_unique_assets()
+print(f"Total assets: {len(unique_symbols)}")  # e.g., 500 unique stocks
+
 # Find which ETFs contain a specific asset
 asset_mapping = portfolio.get_asset_to_etf_mapping()
 print(asset_mapping['AAPL'])  # ['SPY', 'VOO', 'QQQ', ...]

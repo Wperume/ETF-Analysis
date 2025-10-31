@@ -59,6 +59,18 @@ python etf_analyzer.py -d data -f assets
 # Export assets to CSV
 python etf_analyzer.py -d data -f assets -o assets.csv
 
+# Show assets unique to one ETF only (ETF_Count = 1)
+python etf_analyzer.py -d data -f unique
+
+# Export unique assets to CSV
+python etf_analyzer.py -d data -f unique -o unique_assets.csv
+
+# Show assets that overlap across multiple ETFs (ETF_Count > 1)
+python etf_analyzer.py -d data -f overlap
+
+# Export overlapping assets to CSV (sorted by ETF count)
+python etf_analyzer.py -d data -f overlap -o overlap_assets.csv
+
 # Show asset-to-ETF mapping
 python etf_analyzer.py -d data -f mapping
 
@@ -75,7 +87,9 @@ python etf_analyzer.py -d data -f summary -o summary.csv
 - `-f FUNCTION` or `--function FUNCTION`: Operation to perform
   - `summary` (default): Display ETF portfolio summary
   - `list`: List all ETF symbols
-  - `assets`: Show all assets with ETF associations
+  - `assets`: Show all assets with ETF associations (sorted by symbol)
+  - `unique`: Show assets that appear in only one ETF (ETF_Count = 1)
+  - `overlap`: Show assets that appear in multiple ETFs (ETF_Count > 1, sorted by count)
   - `mapping`: Show asset-to-ETF mapping
   - `export`: Export DataFrame to file (requires `-o`)
 - `-o FILE` or `--output FILE`: Output file (if not specified, print to stdout)

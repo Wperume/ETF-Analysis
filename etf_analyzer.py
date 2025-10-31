@@ -688,6 +688,15 @@ Examples:
   # Load CSV files from directory and display summary
   python etf_analyzer.py -d data
 
+  # Show assets unique to one ETF only
+  python etf_analyzer.py -d data -f unique
+
+  # Show assets that overlap across multiple ETFs
+  python etf_analyzer.py -d data -f overlap
+
+  # Export unique assets to CSV
+  python etf_analyzer.py -d data -f unique -o unique_assets.csv
+
   # Load CSV files and export to parquet
   python etf_analyzer.py -d data -f export -o etf_data.parquet
 
@@ -719,7 +728,15 @@ Examples:
     parser.add_argument(
         "-f",
         "--function",
-        choices=["export", "summary", "list", "assets", "mapping"],
+        choices=[
+            "export",
+            "summary",
+            "list",
+            "assets",
+            "mapping",
+            "unique",
+            "overlap",
+        ],
         default="summary",
         help="Operation to perform (default: summary)",
     )
@@ -817,6 +834,45 @@ Examples:
                     print(f"{symbol}: {', '.join(etfs)}")
                 print()
                 print(f"Total unique assets: {len(mapping)}")
+
+        elif args.function == "unique":
+            # Get assets that appear in only one ETF (ETF_Count = 1)
+            assets = portfolio.get_assets_with_etf_list()
+            unique_assets = assets[assets["ETF_Count"] == 1]
+            if args.output:
+                unique_assets.to_csv(args.output, index=False)
+                print(f"Unique assets exported to: {args.output}")
+            else:
+                print("Assets Unique to One ETF (ETF_Count = 1)")
+                print("=" * 60)
+                print(unique_assets.to_string())
+                print()
+                print(f"Total unique assets: {len(unique_assets)}")
+
+        elif args.function == "overlap":
+            # Get assets that appear in more than one ETF (ETF_Count > 1)
+            assets = portfolio.get_assets_with_etf_list()
+            overlap_assets = assets[assets["ETF_Count"] > 1]
+            # Sort by ETF_Count descending for better readability
+            overlap_assets = overlap_assets.sort_values(
+                "ETF_Count", ascending=False
+            )
+            overlap_assets = overlap_assets.reset_index(drop=True)
+            if args.output:
+                overlap_assets.to_csv(args.output, index=False)
+                print(f"Overlapping assets exported to: {args.output}")
+            else:
+                print("Assets in Multiple ETFs (ETF_Count > 1)")
+                print("=" * 60)
+                print(overlap_assets.to_string())
+                print()
+                print(f"Total overlapping assets: {len(overlap_assets)}")
+                if len(overlap_assets) > 0:
+                    max_count = overlap_assets["ETF_Count"].max()
+                    print(
+                        f"Maximum overlap: {max_count} ETFs "
+                        f"({overlap_assets.iloc[0]['Symbol']})"
+                    )
 
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)

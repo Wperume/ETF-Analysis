@@ -29,9 +29,8 @@ wheels/
 *.swo
 *~
 
-# Data files - ignore all files in data directory but keep the directory
-data/*
-!data/.gitkeep
+# Data files - ignore all directories starting with "data"
+data*/
 
 # Jupyter Notebook
 .ipynb_checkpoints

@@ -281,6 +281,68 @@ class TestETFPortfolioAnalyzer:
         assert len(df) == 5
         assert "SPY" in portfolio.etf_analyzers
 
+    def test_get_etf_assets(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test getting assets for a specific ETF"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        assets = portfolio.get_etf_assets("SPY")
+
+        assert len(assets) == 5
+        assert "Symbol" in assets.columns
+        assert "Name" in assets.columns
+        assert "Weight" in assets.columns
+        assert "Shares" in assets.columns
+        assert assets.iloc[0]["Symbol"] == "AAPL"
+
+    def test_get_etf_assets_case_insensitive(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test that get_etf_assets is case insensitive"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        assets = portfolio.get_etf_assets("spy")
+        assert len(assets) == 5
+
+    def test_get_etf_assets_custom_columns(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test get_etf_assets with custom column names"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        assets = portfolio.get_etf_assets(
+            "SPY",
+            symbol_col="ticker",
+            name_col="name",
+            weight_col="weight",
+            shares_col="shares",
+        )
+
+        assert len(assets) == 5
+        assert list(assets.columns) == ["Symbol", "Name", "Weight", "Shares"]
+
+    def test_get_etf_assets_missing_etf_raises_error(
+        self, temp_data_dir, spy_csv_file
+    ):
+        """Test that error is raised for non-existent ETF"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        with pytest.raises(ValueError, match="No data found for ETF"):
+            portfolio.get_etf_assets("INVALID")
+
+    def test_get_etf_assets_before_loading_raises_error(
+        self, temp_data_dir
+    ):
+        """Test that error is raised if data not loaded"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        with pytest.raises(ValueError, match="Data not loaded"):
+            portfolio.get_etf_assets("SPY")
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

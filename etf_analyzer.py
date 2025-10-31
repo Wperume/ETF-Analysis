@@ -246,6 +246,94 @@ class ETFPortfolioAnalyzer:
 
         return self.df[self.df["etf_symbol"] == etf_symbol.upper()]
 
+    def get_columns(self, etf_symbol: Optional[str] = None) -> List[str]:
+        """
+        Get list of columns available in the data
+
+        Args:
+            etf_symbol: Optional ETF symbol to get columns for a specific ETF.
+                If None, returns columns from combined DataFrame.
+
+        Returns:
+            List of column names
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_all_etfs() first.")
+
+        if etf_symbol:
+            etf_data = self.filter_by_etf(etf_symbol)
+            return list(etf_data.columns)
+        return list(self.df.columns)
+
+    def get_etf_assets(
+        self,
+        etf_symbol: str,
+        symbol_col: str = "Symbol",
+        name_col: str = "Name",
+        weight_col: str = "% Weight",
+        shares_col: str = "Shares",
+    ) -> pd.DataFrame:
+        """
+        Extract underlying assets for a specific ETF
+
+        Args:
+            etf_symbol: ETF symbol to get assets for
+            symbol_col: Name of the ticker/symbol column
+            name_col: Name of the security name column
+            weight_col: Name of the weight/percentage column
+            shares_col: Name of the shares column
+
+        Returns:
+            DataFrame with Symbol, Name, Weight, and Shares columns
+
+        Raises:
+            ValueError: If no matching columns found or ETF doesn't exist
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_all_etfs() first.")
+
+        # Filter by ETF
+        etf_data = self.filter_by_etf(etf_symbol)
+
+        if len(etf_data) == 0:
+            raise ValueError(f"No data found for ETF: {etf_symbol}")
+
+        # Build column list - only include columns that exist
+        columns_to_include = []
+        column_mapping = {}
+
+        if symbol_col in etf_data.columns:
+            columns_to_include.append(symbol_col)
+            column_mapping[symbol_col] = "Symbol"
+
+        if name_col in etf_data.columns:
+            columns_to_include.append(name_col)
+            column_mapping[name_col] = "Name"
+
+        if weight_col in etf_data.columns:
+            columns_to_include.append(weight_col)
+            column_mapping[weight_col] = "Weight"
+
+        if shares_col in etf_data.columns:
+            columns_to_include.append(shares_col)
+            column_mapping[shares_col] = "Shares"
+
+        # Warn if no columns found
+        if not columns_to_include:
+            available_cols = list(etf_data.columns)
+            raise ValueError(
+                f"None of the specified columns found in ETF data.\n"
+                f"Looking for: {symbol_col}, {name_col}, "
+                f"{weight_col}, {shares_col}\n"
+                f"Available columns: {available_cols}"
+            )
+
+        # Select and rename columns
+        result = etf_data[columns_to_include].copy()
+        result = result.rename(columns=column_mapping)
+
+        return result
+
 
 def compare_etfs(
     etf_paths: List[str], weight_column: str = "weight"
@@ -298,3 +386,11 @@ if __name__ == "__main__":
     portfolio.load_all_etfs()
     print(portfolio.get_etf_summary())
     print(portfolio.get_etf_list())
+
+    # Check available columns first
+    print("\nAvailable columns in VOT:")
+    print(portfolio.get_columns("VOT"))
+
+    # Get assets using default column names
+    print("\nVOT Assets:")
+    print(portfolio.get_etf_assets("VOT"))

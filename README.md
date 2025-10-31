@@ -42,6 +42,10 @@ print(portfolio.get_etf_summary())
 # Get list of loaded ETFs
 print(portfolio.get_etf_list())
 
+# Get underlying assets for a specific ETF
+spy_assets = portfolio.get_etf_assets('SPY')
+print(spy_assets)  # Returns: Symbol, Name, Weight, Shares
+
 # Filter holdings by specific ETF
 spy_holdings = portfolio.filter_by_etf('SPY')
 print(spy_holdings)

@@ -1,0 +1,27 @@
+# ETF Analyzer Configuration File
+#
+# Copy this file to .etfrc in your current directory or home directory
+# to set default values for command-line options.
+#
+# Configuration file precedence:
+# 1. Current directory .etfrc (checked first)
+# 2. Home directory .etfrc (checked second)
+# 3. Built-in defaults (used if no config file found)
+#
+# Command-line arguments always override configuration file settings.
+
+[defaults]
+# Default data directory containing ETF CSV files
+data_dir = data
+
+# Default function to perform (summary, list, assets, mapping, unique, overlap, export)
+function = summary
+
+# Column name mappings (customize if your CSV files use different column names)
+symbol_col = Symbol
+name_col = Name
+
+# IMPORTANT: Use %% to escape percent signs in INI files
+weight_col = %% Weight
+
+shares_col = Shares

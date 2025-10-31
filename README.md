@@ -102,10 +102,49 @@ python etf_analyzer.py -d data -f assets --symbol-col ticker --name-col company
 - `--shares-col COLUMN`: Column name for shares (default: Shares)
 
 **Notes:**
-- Either `-d` or `-i` must be specified
+- Either `-d` or `-i` must be specified (unless `data_dir` is set in config file)
 - The `-o` option is required for `-f export`
 - Column overrides (`--symbol-col`, etc.) are useful when your CSV files use different column names
 - Only specify the column overrides you need; others will use defaults
+
+**Configuration File:**
+
+You can create a `.etfrc` configuration file in your current directory or home directory to set default values for frequently used options. This eliminates the need to specify the same command-line options repeatedly.
+
+See [.etfrc.example](.etfrc.example) for a template configuration file.
+
+Create a `.etfrc` file with INI format:
+
+```ini
+[defaults]
+data_dir = data
+function = summary
+symbol_col = Symbol
+name_col = Name
+weight_col = %% Weight
+shares_col = Shares
+```
+
+**Important:** Use `%%` to escape percent signs in the .etfrc file (e.g., `%% Weight` instead of `% Weight`).
+
+Configuration file precedence:
+1. Current directory `.etfrc` (checked first)
+2. Home directory `.etfrc` (checked if not found in current directory)
+3. Built-in defaults (used if no config file found)
+
+Command-line arguments always override configuration file settings.
+
+Examples with configuration file:
+```bash
+# If .etfrc sets data_dir=data, you can simply run:
+python etf_analyzer.py
+
+# Override config file's function setting:
+python etf_analyzer.py -f unique
+
+# Config file makes common operations simpler:
+python etf_analyzer.py -f assets -o assets.csv
+```
 
 ### Python API - Analyze All ETFs in a Directory
 

@@ -672,12 +672,72 @@ def compare_etfs(
     return etf_data
 
 
+def load_config() -> dict:
+    """
+    Load configuration from .etfrc file in current directory or home
+    directory. Returns a dictionary of configuration values.
+
+    Config file format (INI):
+    [defaults]
+    data_dir = data
+    function = summary
+    symbol_col = Symbol
+    name_col = Name
+    weight_col = % Weight
+    shares_col = Shares
+    """
+    import configparser
+    from pathlib import Path
+
+    # Set built-in defaults first
+    defaults = {
+        "function": "summary",
+        "symbol_col": "Symbol",
+        "name_col": "Name",
+        "weight_col": "% Weight",
+        "shares_col": "Shares",
+    }
+
+    config = configparser.ConfigParser()
+    config_paths = [
+        Path.cwd() / ".etfrc",  # Current directory
+        Path.home() / ".etfrc",  # Home directory
+    ]
+
+    # Try to load config file
+    for config_path in config_paths:
+        if config_path.exists():
+            config.read(config_path)
+            break
+
+    # Override with config file values if they exist
+    if "defaults" in config:
+        section = config["defaults"]
+        if "data_dir" in section:
+            defaults["data"] = section["data_dir"]
+        if "function" in section:
+            defaults["function"] = section["function"]
+        if "symbol_col" in section:
+            defaults["symbol_col"] = section["symbol_col"]
+        if "name_col" in section:
+            defaults["name_col"] = section["name_col"]
+        if "weight_col" in section:
+            defaults["weight_col"] = section["weight_col"]
+        if "shares_col" in section:
+            defaults["shares_col"] = section["shares_col"]
+
+    return defaults
+
+
 def main():
     """
     Command-line interface for ETF Analyzer
     """
     import argparse
     import sys
+
+    # Load configuration file defaults
+    config_defaults = load_config()
 
     parser = argparse.ArgumentParser(
         description="ETF Holdings Analyzer - Load, analyze, and "
@@ -705,11 +765,30 @@ Examples:
 
   # Load parquet and export as CSV
   python etf_analyzer.py -i etf_data.parquet -f export -o etf_data.csv
+
+Configuration File:
+  Create a .etfrc file in your current or home directory with:
+  [defaults]
+  data_dir = data
+  function = summary
+  symbol_col = Symbol
+  name_col = Name
+  weight_col = %% Weight
+  shares_col = Shares
+
+  Note: Use %% to escape percent signs in .etfrc file
         """,
     )
 
+    # Apply config file defaults
+    parser.set_defaults(**config_defaults)
+
     # Input options (mutually exclusive)
-    input_group = parser.add_mutually_exclusive_group(required=True)
+    # Note: required=True unless config provides data_dir
+    input_required = "data" not in config_defaults
+    input_group = parser.add_mutually_exclusive_group(
+        required=input_required
+    )
     input_group.add_argument(
         "-d",
         "--data",
@@ -737,7 +816,6 @@ Examples:
             "unique",
             "overlap",
         ],
-        default="summary",
         help="Operation to perform (default: summary)",
     )
 
@@ -753,25 +831,21 @@ Examples:
     parser.add_argument(
         "--symbol-col",
         metavar="COLUMN",
-        default="Symbol",
         help="Column name for asset symbol (default: Symbol)",
     )
     parser.add_argument(
         "--name-col",
         metavar="COLUMN",
-        default="Name",
         help="Column name for asset name (default: Name)",
     )
     parser.add_argument(
         "--weight-col",
         metavar="COLUMN",
-        default="% Weight",
         help="Column name for weight/percentage (default: %% Weight)",
     )
     parser.add_argument(
         "--shares-col",
         metavar="COLUMN",
-        default="Shares",
         help="Column name for shares (default: Shares)",
     )
 

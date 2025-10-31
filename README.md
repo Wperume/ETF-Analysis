@@ -66,6 +66,17 @@ print(assets_alphabetical.head(10))  # First 10 assets alphabetically
 portfolio.export_asset_analysis('assets_by_symbol.csv', sort_by='symbol')
 portfolio.export_asset_analysis('assets_by_etf_count.csv', sort_by='etf_count')
 
+# Export the full DataFrame for later use
+portfolio.export_dataframe('etf_data.parquet')  # Default format
+portfolio.export_dataframe('etf_data.csv')      # CSV format
+portfolio.export_dataframe('etf_data.pkl')      # Pickle format
+portfolio.export_dataframe('etf_data')          # Uses .parquet by default
+
+# Load a previously saved DataFrame
+portfolio2 = ETFPortfolioAnalyzer('data')
+portfolio2.load_dataframe('etf_data.parquet')
+print(portfolio2.df.head())  # DataFrame is ready to use
+
 # Filter holdings by specific ETF
 spy_holdings = portfolio.filter_by_etf('SPY')
 print(spy_holdings)

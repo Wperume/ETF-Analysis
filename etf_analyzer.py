@@ -546,6 +546,107 @@ class ETFPortfolioAnalyzer:
         print(f"Total assets: {len(df)}")
         print(f"Sort order: {sort_by}")
 
+    def export_dataframe(self, output_path: str) -> None:
+        """
+        Export the full combined DataFrame to a file
+
+        Supports multiple formats based on file extension:
+        - .parquet (default): Efficient binary format, preserves types
+        - .csv: Human-readable text format
+        - .pkl/.pickle: Python pickle format
+
+        Args:
+            output_path: Path to output file. If no extension provided,
+                .parquet is used as default
+
+        Raises:
+            ValueError: If data not loaded or unsupported file format
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_all_etfs() first.")
+
+        output_file = Path(output_path)
+
+        # Add default extension if none provided
+        if not output_file.suffix:
+            output_file = output_file.with_suffix(".parquet")
+
+        # Export based on file extension
+        extension = output_file.suffix.lower()
+
+        if extension == ".parquet":
+            self.df.to_parquet(output_file, index=False)
+        elif extension == ".csv":
+            self.df.to_csv(output_file, index=False)
+        elif extension in [".pkl", ".pickle"]:
+            self.df.to_pickle(output_file)
+        else:
+            raise ValueError(
+                f"Unsupported format: {extension}. "
+                f"Use .parquet, .csv, .pkl, or .pickle"
+            )
+
+        print(f"DataFrame exported to {output_file}")
+        print(f"Format: {extension}")
+        print(f"Shape: {self.df.shape[0]} rows, {self.df.shape[1]} columns")
+
+    def load_dataframe(self, input_path: str) -> pd.DataFrame:
+        """
+        Load a previously exported DataFrame from a file
+
+        Supports multiple formats based on file extension:
+        - .parquet (default): Efficient binary format
+        - .csv: Human-readable text format
+        - .pkl/.pickle: Python pickle format
+
+        Args:
+            input_path: Path to input file. If no extension provided,
+                .parquet is assumed
+
+        Returns:
+            Loaded DataFrame
+
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            ValueError: If unsupported file format
+        """
+        input_file = Path(input_path)
+
+        # Add default extension if none provided
+        if not input_file.suffix:
+            input_file = input_file.with_suffix(".parquet")
+
+        if not input_file.exists():
+            raise FileNotFoundError(f"File not found: {input_file}")
+
+        # Load based on file extension
+        extension = input_file.suffix.lower()
+
+        if extension == ".parquet":
+            df = pd.read_parquet(input_file)
+        elif extension == ".csv":
+            df = pd.read_csv(input_file)
+        elif extension in [".pkl", ".pickle"]:
+            df = pd.read_pickle(input_file)
+        else:
+            raise ValueError(
+                f"Unsupported format: {extension}. "
+                f"Use .parquet, .csv, .pkl, or .pickle"
+            )
+
+        self.df = df
+        print(f"DataFrame loaded from {input_file}")
+        print(f"Format: {extension}")
+        print(f"Shape: {df.shape[0]} rows, {df.shape[1]} columns")
+
+        # Rebuild etf_analyzers dictionary
+        self.etf_analyzers = {}
+        if "etf_symbol" in df.columns:
+            for etf_symbol in df["etf_symbol"].unique():
+                self.etf_analyzers[etf_symbol] = None
+
+        return df
+
 
 def compare_etfs(
     etf_paths: List[str], weight_column: str = "weight"

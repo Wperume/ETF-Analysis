@@ -578,6 +578,156 @@ class TestETFPortfolioAnalyzer:
                 str(output_file), sort_by="invalid"
             )
 
+    def test_export_dataframe_parquet(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test exporting DataFrame to Parquet format"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "etf_data.parquet"
+        portfolio.export_dataframe(str(output_file))
+
+        assert output_file.exists()
+
+        # Load it back
+        df = pd.read_parquet(output_file)
+        assert len(df) == 8  # 5 from SPY + 3 from QQQ
+        assert "etf_symbol" in df.columns
+
+    def test_export_dataframe_default_extension(
+        self, temp_data_dir, spy_csv_file
+    ):
+        """Test that .parquet is added as default extension"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_path = temp_data_dir / "etf_data"
+        portfolio.export_dataframe(str(output_path))
+
+        # Should have added .parquet extension
+        expected_file = temp_data_dir / "etf_data.parquet"
+        assert expected_file.exists()
+
+    def test_export_dataframe_csv(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test exporting DataFrame to CSV format"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "etf_data.csv"
+        portfolio.export_dataframe(str(output_file))
+
+        assert output_file.exists()
+
+        # Load it back
+        df = pd.read_csv(output_file)
+        assert len(df) == 8
+
+    def test_export_dataframe_pickle(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test exporting DataFrame to pickle format"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "etf_data.pkl"
+        portfolio.export_dataframe(str(output_file))
+
+        assert output_file.exists()
+
+        # Load it back
+        df = pd.read_pickle(output_file)
+        assert len(df) == 8
+
+    def test_export_dataframe_unsupported_format(
+        self, temp_data_dir, spy_csv_file
+    ):
+        """Test that unsupported format raises error"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "output.json"
+        with pytest.raises(ValueError, match="Unsupported format"):
+            portfolio.export_dataframe(str(output_file))
+
+    def test_export_dataframe_before_loading_raises_error(
+        self, temp_data_dir
+    ):
+        """Test that error is raised if data not loaded"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        output_file = temp_data_dir / "output.parquet"
+
+        with pytest.raises(ValueError, match="Data not loaded"):
+            portfolio.export_dataframe(str(output_file))
+
+    def test_load_dataframe_parquet(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test loading DataFrame from Parquet file"""
+        # First export
+        portfolio1 = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio1.load_all_etfs()
+        output_file = temp_data_dir / "etf_data.parquet"
+        portfolio1.export_dataframe(str(output_file))
+
+        # Load in new portfolio
+        portfolio2 = ETFPortfolioAnalyzer(str(temp_data_dir))
+        df = portfolio2.load_dataframe(str(output_file))
+
+        assert len(df) == 8
+        assert "etf_symbol" in df.columns
+        assert portfolio2.df is not None
+        assert len(portfolio2.etf_analyzers) == 2  # SPY and QQQ
+
+    def test_load_dataframe_default_extension(self, temp_data_dir):
+        """Test that .parquet is assumed if no extension"""
+        # Create a parquet file first
+        df = pd.DataFrame({"a": [1, 2], "etf_symbol": ["TEST", "TEST"]})
+        output_file = temp_data_dir / "test.parquet"
+        df.to_parquet(output_file, index=False)
+
+        # Load without extension
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        loaded_df = portfolio.load_dataframe(str(temp_data_dir / "test"))
+
+        assert len(loaded_df) == 2
+
+    def test_load_dataframe_csv(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test loading DataFrame from CSV file"""
+        # First export
+        portfolio1 = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio1.load_all_etfs()
+        output_file = temp_data_dir / "etf_data.csv"
+        portfolio1.export_dataframe(str(output_file))
+
+        # Load in new portfolio
+        portfolio2 = ETFPortfolioAnalyzer(str(temp_data_dir))
+        df = portfolio2.load_dataframe(str(output_file))
+
+        assert len(df) == 8
+
+    def test_load_dataframe_file_not_found(self, temp_data_dir):
+        """Test that FileNotFoundError is raised for missing file"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+
+        with pytest.raises(FileNotFoundError, match="File not found"):
+            portfolio.load_dataframe(str(temp_data_dir / "missing.parquet"))
+
+    def test_load_dataframe_unsupported_format(self, temp_data_dir):
+        """Test that unsupported format raises error"""
+        # Create a file with unsupported extension
+        test_file = temp_data_dir / "test.json"
+        test_file.write_text('{"test": "data"}')
+
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+
+        with pytest.raises(ValueError, match="Unsupported format"):
+            portfolio.load_dataframe(str(test_file))
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

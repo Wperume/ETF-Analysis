@@ -79,6 +79,9 @@ python etf_analyzer.py -d data -f mapping -o mapping.csv
 
 # Export summary to CSV
 python etf_analyzer.py -d data -f summary -o summary.csv
+
+# Use custom column names (if your CSV has different column names)
+python etf_analyzer.py -d data -f assets --symbol-col ticker --name-col company
 ```
 
 **Command-Line Options:**
@@ -93,8 +96,16 @@ python etf_analyzer.py -d data -f summary -o summary.csv
   - `mapping`: Show asset-to-ETF mapping
   - `export`: Export DataFrame to file (requires `-o`)
 - `-o FILE` or `--output FILE`: Output file (if not specified, print to stdout)
+- `--symbol-col COLUMN`: Column name for asset symbol (default: Symbol)
+- `--name-col COLUMN`: Column name for asset name (default: Name)
+- `--weight-col COLUMN`: Column name for weight/percentage (default: % Weight)
+- `--shares-col COLUMN`: Column name for shares (default: Shares)
 
-**Note:** Either `-d` or `-i` must be specified. The `-o` option is required for `-f export`.
+**Notes:**
+- Either `-d` or `-i` must be specified
+- The `-o` option is required for `-f export`
+- Column overrides (`--symbol-col`, etc.) are useful when your CSV files use different column names
+- Only specify the column overrides you need; others will use defaults
 
 ### Python API - Analyze All ETFs in a Directory
 

@@ -749,6 +749,32 @@ Examples:
         help="Output file (if not specified, print to stdout)",
     )
 
+    # Column name overrides
+    parser.add_argument(
+        "--symbol-col",
+        metavar="COLUMN",
+        default="Symbol",
+        help="Column name for asset symbol (default: Symbol)",
+    )
+    parser.add_argument(
+        "--name-col",
+        metavar="COLUMN",
+        default="Name",
+        help="Column name for asset name (default: Name)",
+    )
+    parser.add_argument(
+        "--weight-col",
+        metavar="COLUMN",
+        default="% Weight",
+        help="Column name for weight/percentage (default: %% Weight)",
+    )
+    parser.add_argument(
+        "--shares-col",
+        metavar="COLUMN",
+        default="Shares",
+        help="Column name for shares (default: Shares)",
+    )
+
     args = parser.parse_args()
 
     # Validate arguments
@@ -804,7 +830,9 @@ Examples:
                 print(f"Total ETFs: {len(etf_list)}")
 
         elif args.function == "assets":
-            assets = portfolio.get_assets_with_etf_list()
+            assets = portfolio.get_assets_with_etf_list(
+                symbol_col=args.symbol_col, name_col=args.name_col
+            )
             if args.output:
                 assets.to_csv(args.output, index=False)
                 print(f"Asset list exported to: {args.output}")
@@ -816,7 +844,9 @@ Examples:
                 print(f"Total unique assets: {len(assets)}")
 
         elif args.function == "mapping":
-            mapping = portfolio.get_asset_to_etf_mapping()
+            mapping = portfolio.get_asset_to_etf_mapping(
+                symbol_col=args.symbol_col
+            )
             if args.output:
                 # Export mapping as CSV with proper formatting
                 rows = []
@@ -837,7 +867,9 @@ Examples:
 
         elif args.function == "unique":
             # Get assets that appear in only one ETF (ETF_Count = 1)
-            assets = portfolio.get_assets_with_etf_list()
+            assets = portfolio.get_assets_with_etf_list(
+                symbol_col=args.symbol_col, name_col=args.name_col
+            )
             unique_assets = assets[assets["ETF_Count"] == 1]
             if args.output:
                 unique_assets.to_csv(args.output, index=False)
@@ -851,7 +883,9 @@ Examples:
 
         elif args.function == "overlap":
             # Get assets that appear in more than one ETF (ETF_Count > 1)
-            assets = portfolio.get_assets_with_etf_list()
+            assets = portfolio.get_assets_with_etf_list(
+                symbol_col=args.symbol_col, name_col=args.name_col
+            )
             overlap_assets = assets[assets["ETF_Count"] > 1]
             # Sort by ETF_Count descending for better readability
             overlap_assets = overlap_assets.sort_values(

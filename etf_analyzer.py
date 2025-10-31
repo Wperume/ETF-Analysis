@@ -23,7 +23,8 @@ class ETFAnalyzer:
         """
         self.csv_path = Path(csv_path)
         self.df: Optional[pd.DataFrame] = None
-        # Extract ETF symbol from filename (e.g., "SPY" from "SPY-etf-holdings.csv")
+        # Extract ETF symbol from filename (e.g., "SPY" from
+        # "SPY-etf-holdings.csv")
         filename = self.csv_path.stem
         self.etf_name = filename.split("-etf-holdings")[0].upper()
 
@@ -176,7 +177,9 @@ class ETFPortfolioAnalyzer:
         self.df: Optional[pd.DataFrame] = None
         self.etf_analyzers: Dict[str, ETFAnalyzer] = {}
 
-    def load_all_etfs(self, pattern: str = "*-etf-holdings.csv", **kwargs) -> pd.DataFrame:
+    def load_all_etfs(
+        self, pattern: str = "*-etf-holdings.csv", **kwargs
+    ) -> pd.DataFrame:
         """
         Load all ETF CSV files from the directory into a single DataFrame
 
@@ -202,7 +205,11 @@ class ETFPortfolioAnalyzer:
             self.etf_analyzers[analyzer.etf_name] = analyzer
 
         self.df = pd.concat(all_dfs, ignore_index=True)
-        print(f"\nCombined {len(csv_files)} ETFs with {len(self.df)} total holdings")
+        total_holdings = len(self.df)
+        print(
+            f"\nCombined {len(csv_files)} ETFs with "
+            f"{total_holdings} total holdings"
+        )
         return self.df
 
     def get_etf_list(self) -> List[str]:
@@ -286,3 +293,8 @@ if __name__ == "__main__":
     print("analyzer.load_data()")
     print("print(analyzer.get_summary_stats())")
     print("print(analyzer.get_top_holdings(10))")
+
+    portfolio = ETFPortfolioAnalyzer("data")
+    portfolio.load_all_etfs()
+    print(portfolio.get_etf_summary())
+    print(portfolio.get_etf_list())

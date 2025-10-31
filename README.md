@@ -46,6 +46,14 @@ print(portfolio.get_etf_list())
 spy_assets = portfolio.get_etf_assets('SPY')
 print(spy_assets)  # Returns: Symbol, Name, Weight, Shares
 
+# Find which ETFs contain a specific asset
+asset_mapping = portfolio.get_asset_to_etf_mapping()
+print(asset_mapping['AAPL'])  # ['SPY', 'VOO', 'QQQ', ...]
+
+# Get most common assets across all ETFs
+common_assets = portfolio.get_assets_by_etf_count()
+print(common_assets.head(10))  # Top 10 most held assets
+
 # Filter holdings by specific ETF
 spy_holdings = portfolio.filter_by_etf('SPY')
 print(spy_holdings)

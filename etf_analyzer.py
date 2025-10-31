@@ -334,6 +334,89 @@ class ETFPortfolioAnalyzer:
 
         return result
 
+    def get_asset_to_etf_mapping(
+        self, symbol_col: str = "Symbol"
+    ) -> Dict[str, List[str]]:
+        """
+        Create a mapping of assets to ETFs that contain them
+
+        Args:
+            symbol_col: Name of the asset symbol column
+
+        Returns:
+            Dictionary where keys are asset symbols and values are
+            lists of ETF symbols that contain that asset
+
+        Raises:
+            ValueError: If data not loaded or symbol column not found
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_all_etfs() first.")
+
+        if symbol_col not in self.df.columns:
+            available_cols = list(self.df.columns)
+            raise ValueError(
+                f"Column '{symbol_col}' not found in data.\n"
+                f"Available columns: {available_cols}"
+            )
+
+        # Group by asset symbol and collect ETF symbols
+        asset_mapping = {}
+        for asset_symbol in self.df[symbol_col].unique():
+            # Skip NaN values
+            if pd.isna(asset_symbol):
+                continue
+
+            # Get all ETFs that contain this asset
+            etfs_with_asset = self.df[self.df[symbol_col] == asset_symbol][
+                "etf_symbol"
+            ].unique()
+            asset_mapping[asset_symbol] = sorted(list(etfs_with_asset))
+
+        return asset_mapping
+
+    def get_assets_by_etf_count(
+        self, symbol_col: str = "Symbol", name_col: str = "Name"
+    ) -> pd.DataFrame:
+        """
+        Get assets ranked by how many ETFs contain them
+
+        Args:
+            symbol_col: Name of the asset symbol column
+            name_col: Name of the asset name column
+
+        Returns:
+            DataFrame with columns: Symbol, Name, ETF_Count, ETFs
+            Sorted by ETF_Count descending
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_all_etfs() first.")
+
+        # Get the mapping
+        mapping = self.get_asset_to_etf_mapping(symbol_col)
+
+        # Build result DataFrame
+        results = []
+        for symbol, etfs in mapping.items():
+            # Get the asset name (use first occurrence)
+            asset_data = self.df[self.df[symbol_col] == symbol].iloc[0]
+            name = asset_data.get(name_col, "N/A")
+
+            results.append(
+                {
+                    "Symbol": symbol,
+                    "Name": name,
+                    "ETF_Count": len(etfs),
+                    "ETFs": ", ".join(etfs),
+                }
+            )
+
+        result_df = pd.DataFrame(results)
+        result_df = result_df.sort_values("ETF_Count", ascending=False)
+        result_df = result_df.reset_index(drop=True)
+
+        return result_df
+
 
 def compare_etfs(
     etf_paths: List[str], weight_column: str = "weight"
@@ -392,5 +475,15 @@ if __name__ == "__main__":
     print(portfolio.get_columns("VOT"))
 
     # Get assets using default column names
-    print("\nVOT Assets:")
-    print(portfolio.get_etf_assets("VOT"))
+    print("\nVOT Assets (first 5):")
+    print(portfolio.get_etf_assets("VOT").head())
+
+    # Get asset to ETF mapping
+    print("\nAsset to ETF mapping (showing AAPL as example):")
+    mapping = portfolio.get_asset_to_etf_mapping()
+    if "AAPL" in mapping:
+        print(f"AAPL is in: {mapping['AAPL']}")
+
+    # Get most common assets across all ETFs
+    print("\nMost common assets (top 10):")
+    print(portfolio.get_assets_by_etf_count().head(10))

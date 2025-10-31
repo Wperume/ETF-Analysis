@@ -288,7 +288,14 @@ class TestETFPortfolioAnalyzer:
         portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
         portfolio.load_all_etfs()
 
-        assets = portfolio.get_etf_assets("SPY")
+        # Use test data column names (lowercase)
+        assets = portfolio.get_etf_assets(
+            "SPY",
+            symbol_col="ticker",
+            name_col="name",
+            weight_col="weight",
+            shares_col="shares",
+        )
 
         assert len(assets) == 5
         assert "Symbol" in assets.columns
@@ -304,7 +311,14 @@ class TestETFPortfolioAnalyzer:
         portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
         portfolio.load_all_etfs()
 
-        assets = portfolio.get_etf_assets("spy")
+        # Use test data column names (lowercase)
+        assets = portfolio.get_etf_assets(
+            "spy",
+            symbol_col="ticker",
+            name_col="name",
+            weight_col="weight",
+            shares_col="shares",
+        )
         assert len(assets) == 5
 
     def test_get_etf_assets_custom_columns(
@@ -342,6 +356,72 @@ class TestETFPortfolioAnalyzer:
         portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
         with pytest.raises(ValueError, match="Data not loaded"):
             portfolio.get_etf_assets("SPY")
+
+    def test_get_asset_to_etf_mapping(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test creating asset to ETF mapping"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        mapping = portfolio.get_asset_to_etf_mapping(symbol_col="ticker")
+
+        # Check that AAPL is in mapping (from SPY)
+        assert "AAPL" in mapping
+        assert "SPY" in mapping["AAPL"]
+
+        # Check that NVDA is in mapping (from QQQ)
+        assert "NVDA" in mapping
+        assert "QQQ" in mapping["NVDA"]
+
+    def test_get_asset_to_etf_mapping_invalid_column(
+        self, temp_data_dir, spy_csv_file
+    ):
+        """Test that error is raised for invalid symbol column"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        with pytest.raises(ValueError, match="not found in data"):
+            portfolio.get_asset_to_etf_mapping(symbol_col="invalid")
+
+    def test_get_assets_by_etf_count(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test getting assets ranked by ETF count"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        result = portfolio.get_assets_by_etf_count(
+            symbol_col="ticker", name_col="name"
+        )
+
+        # Check result structure
+        assert "Symbol" in result.columns
+        assert "Name" in result.columns
+        assert "ETF_Count" in result.columns
+        assert "ETFs" in result.columns
+
+        # Check that it's sorted by ETF_Count descending
+        assert result["ETF_Count"].is_monotonic_decreasing
+
+        # Each asset should appear only once
+        assert len(result) == result["Symbol"].nunique()
+
+    def test_get_columns(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test getting column list"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        # Get all columns
+        all_cols = portfolio.get_columns()
+        assert "etf_symbol" in all_cols
+        assert "ticker" in all_cols
+
+        # Get columns for specific ETF
+        spy_cols = portfolio.get_columns("SPY")
+        assert spy_cols == all_cols  # Same structure for all ETFs
 
 
 if __name__ == "__main__":

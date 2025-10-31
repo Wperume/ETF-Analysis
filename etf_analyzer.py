@@ -19,10 +19,13 @@ class ETFAnalyzer:
 
         Args:
             csv_path: Path to the ETF holdings CSV file
+                Expected format: {SYMBOL}-etf-holdings.csv
         """
         self.csv_path = Path(csv_path)
         self.df: Optional[pd.DataFrame] = None
-        self.etf_name = self.csv_path.stem
+        # Extract ETF symbol from filename (e.g., "SPY" from "SPY-etf-holdings.csv")
+        filename = self.csv_path.stem
+        self.etf_name = filename.split("-etf-holdings")[0].upper()
 
     def load_data(self, **kwargs) -> pd.DataFrame:
         """
@@ -32,9 +35,10 @@ class ETFAnalyzer:
             **kwargs: Additional arguments to pass to pd.read_csv()
 
         Returns:
-            Loaded DataFrame
+            Loaded DataFrame with ETF symbol added as a column
         """
         df = pd.read_csv(self.csv_path, **kwargs)
+        df.insert(0, "etf_symbol", self.etf_name)
         self.df = df
         print(f"Loaded {len(df)} holdings from {self.csv_path.name}")
         return df
@@ -157,6 +161,85 @@ class ETFAnalyzer:
         print(f"Analysis exported to {output_file}")
 
 
+class ETFPortfolioAnalyzer:
+    """Analyze multiple ETF holdings from a directory"""
+
+    def __init__(self, data_dir: str):
+        """
+        Initialize the portfolio analyzer with a data directory
+
+        Args:
+            data_dir: Path to directory containing ETF CSV files
+                Expected format: {SYMBOL}-etf-holdings.csv
+        """
+        self.data_dir = Path(data_dir)
+        self.df: Optional[pd.DataFrame] = None
+        self.etf_analyzers: Dict[str, ETFAnalyzer] = {}
+
+    def load_all_etfs(self, pattern: str = "*-etf-holdings.csv", **kwargs) -> pd.DataFrame:
+        """
+        Load all ETF CSV files from the directory into a single DataFrame
+
+        Args:
+            pattern: Glob pattern for ETF files (default: *-etf-holdings.csv)
+            **kwargs: Additional arguments to pass to pd.read_csv()
+
+        Returns:
+            Combined DataFrame with all ETF holdings
+        """
+        csv_files = list(self.data_dir.glob(pattern))
+
+        if not csv_files:
+            raise FileNotFoundError(
+                f"No files matching '{pattern}' found in {self.data_dir}"
+            )
+
+        all_dfs = []
+        for csv_file in sorted(csv_files):
+            analyzer = ETFAnalyzer(str(csv_file))
+            df = analyzer.load_data(**kwargs)
+            all_dfs.append(df)
+            self.etf_analyzers[analyzer.etf_name] = analyzer
+
+        self.df = pd.concat(all_dfs, ignore_index=True)
+        print(f"\nCombined {len(csv_files)} ETFs with {len(self.df)} total holdings")
+        return self.df
+
+    def get_etf_list(self) -> List[str]:
+        """Get list of ETF symbols that have been loaded"""
+        return list(self.etf_analyzers.keys())
+
+    def get_etf_summary(self) -> pd.DataFrame:
+        """
+        Get summary statistics for each ETF
+
+        Returns:
+            DataFrame with ETF summary statistics
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_all_etfs() first.")
+
+        summary = self.df.groupby("etf_symbol").agg(
+            holdings_count=("etf_symbol", "count")
+        )
+        return summary
+
+    def filter_by_etf(self, etf_symbol: str) -> pd.DataFrame:
+        """
+        Filter holdings by ETF symbol
+
+        Args:
+            etf_symbol: ETF symbol to filter by
+
+        Returns:
+            DataFrame with holdings for specified ETF
+        """
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_all_etfs() first.")
+
+        return self.df[self.df["etf_symbol"] == etf_symbol.upper()]
+
+
 def compare_etfs(
     etf_paths: List[str], weight_column: str = "weight"
 ) -> Dict[str, Optional[pd.DataFrame]]:
@@ -186,13 +269,20 @@ if __name__ == "__main__":
     print("ETF Analyzer - Example Usage")
     print("-" * 50)
 
-    # Create an example of how to use the analyzer
-    example_path = "data/sample_etf.csv"
-
-    print("\nTo use this analyzer:")
+    print("\nOption 1: Analyze all ETFs in a directory")
+    print("=" * 50)
     print("1. Place your ETF CSV files in the 'data/' directory")
+    print("   Format: {SYMBOL}-etf-holdings.csv")
+    print("   Examples: SPY-etf-holdings.csv, QQQ-etf-holdings.csv\n")
     print("2. Run the following code:\n")
-    print(f"analyzer = ETFAnalyzer('{example_path}')")
+    print("portfolio = ETFPortfolioAnalyzer('data')")
+    print("portfolio.load_all_etfs()")
+    print("print(portfolio.get_etf_summary())")
+    print("print(portfolio.get_etf_list())")
+
+    print("\n\nOption 2: Analyze a single ETF file")
+    print("=" * 50)
+    print("analyzer = ETFAnalyzer('data/SPY-etf-holdings.csv')")
     print("analyzer.load_data()")
     print("print(analyzer.get_summary_stats())")
     print("print(analyzer.get_top_holdings(10))")

@@ -27,13 +27,36 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Basic Analysis
+### Analyze All ETFs in a Directory (Recommended)
+
+```python
+from etf_analyzer import ETFPortfolioAnalyzer
+
+# Load all ETF holdings from a directory
+portfolio = ETFPortfolioAnalyzer('data')
+portfolio.load_all_etfs()
+
+# Get summary of all ETFs
+print(portfolio.get_etf_summary())
+
+# Get list of loaded ETFs
+print(portfolio.get_etf_list())
+
+# Filter holdings by specific ETF
+spy_holdings = portfolio.filter_by_etf('SPY')
+print(spy_holdings)
+
+# Access the combined DataFrame
+print(portfolio.df.head())
+```
+
+### Analyze a Single ETF
 
 ```python
 from etf_analyzer import ETFAnalyzer
 
-# Load an ETF holdings CSV file
-analyzer = ETFAnalyzer('data/your_etf.csv')
+# Load a single ETF holdings CSV file
+analyzer = ETFAnalyzer('data/SPY-etf-holdings.csv')
 analyzer.load_data()
 
 # Get summary statistics
@@ -52,17 +75,17 @@ print(sector_analysis)
 analyzer.plot_top_holdings(n=10, weight_column='weight', name_column='name')
 ```
 
-### Compare Multiple ETFs
-
-```python
-from etf_analyzer import compare_etfs
-
-etf_files = ['data/etf1.csv', 'data/etf2.csv', 'data/etf3.csv']
-comparison = compare_etfs(etf_files)
-```
-
 ## CSV File Format
 
+### File Naming Convention
+Files must follow this pattern: `{SYMBOL}-etf-holdings.csv`
+
+Examples:
+- `SPY-etf-holdings.csv` (S&P 500 ETF)
+- `QQQ-etf-holdings.csv` (Nasdaq-100 ETF)
+- `VOO-etf-holdings.csv` (Vanguard S&P 500 ETF)
+
+### CSV Structure
 Your CSV files should contain ETF holdings data with columns such as:
 - `name` or `ticker`: Security name or ticker symbol
 - `weight` or `percentage`: Percentage of the ETF portfolio
@@ -76,6 +99,8 @@ ticker,name,weight,sector,shares,market_value
 AAPL,Apple Inc.,5.2,Technology,1000000,175000000
 MSFT,Microsoft Corporation,4.8,Technology,900000,310000000
 ```
+
+**Note:** When loaded, an `etf_symbol` column is automatically added to identify which ETF each holding belongs to.
 
 ## Project Structure
 

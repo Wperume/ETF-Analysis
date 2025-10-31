@@ -27,7 +27,62 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Analyze All ETFs in a Directory (Recommended)
+### Command-Line Interface (Recommended)
+
+The analyzer includes a command-line interface for quick operations:
+
+```bash
+# Display help
+python etf_analyzer.py --help
+
+# Load CSV files from directory and display summary
+python etf_analyzer.py -d data
+
+# Load CSV files and export DataFrame to parquet
+python etf_analyzer.py -d data -f export -o etf_data.parquet
+
+# Load previously saved parquet file and display summary
+python etf_analyzer.py -i etf_data.parquet
+
+# Load and export as CSV
+python etf_analyzer.py -i etf_data.parquet -f export -o etf_data.csv
+
+# Show list of ETFs
+python etf_analyzer.py -d data -f list
+
+# Export list to file
+python etf_analyzer.py -d data -f list -o etf_list.txt
+
+# Show all assets with ETF associations
+python etf_analyzer.py -d data -f assets
+
+# Export assets to CSV
+python etf_analyzer.py -d data -f assets -o assets.csv
+
+# Show asset-to-ETF mapping
+python etf_analyzer.py -d data -f mapping
+
+# Export mapping to CSV
+python etf_analyzer.py -d data -f mapping -o mapping.csv
+
+# Export summary to CSV
+python etf_analyzer.py -d data -f summary -o summary.csv
+```
+
+**Command-Line Options:**
+- `-d DIR` or `--data DIR`: Directory containing ETF CSV files
+- `-i FILE` or `--import FILE`: Import previously exported DataFrame
+- `-f FUNCTION` or `--function FUNCTION`: Operation to perform
+  - `summary` (default): Display ETF portfolio summary
+  - `list`: List all ETF symbols
+  - `assets`: Show all assets with ETF associations
+  - `mapping`: Show asset-to-ETF mapping
+  - `export`: Export DataFrame to file (requires `-o`)
+- `-o FILE` or `--output FILE`: Output file (if not specified, print to stdout)
+
+**Note:** Either `-d` or `-i` must be specified. The `-o` option is required for `-f export`.
+
+### Python API - Analyze All ETFs in a Directory
 
 ```python
 from etf_analyzer import ETFPortfolioAnalyzer
@@ -155,6 +210,7 @@ ETF-Analysis/
 - matplotlib: Data visualization
 - seaborn: Statistical data visualization
 - openpyxl: Excel file support
+- pyarrow: Parquet file support for efficient DataFrame storage
 
 ## License
 

@@ -175,7 +175,7 @@ class ETFPortfolioAnalyzer:
         """
         self.data_dir = Path(data_dir)
         self.df: Optional[pd.DataFrame] = None
-        self.etf_analyzers: Dict[str, ETFAnalyzer] = {}
+        self.etf_analyzers: Dict[str, Optional[ETFAnalyzer]] = {}
 
     def load_all_etfs(
         self, pattern: str = "*-etf-holdings.csv", **kwargs
@@ -672,60 +672,162 @@ def compare_etfs(
     return etf_data
 
 
+def main():
+    """
+    Command-line interface for ETF Analyzer
+    """
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(
+        description="ETF Holdings Analyzer - Load, analyze, and "
+        "export ETF portfolio data",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Load CSV files from directory and display summary
+  python etf_analyzer.py -d data
+
+  # Load CSV files and export to parquet
+  python etf_analyzer.py -d data -f export -o etf_data.parquet
+
+  # Load previously saved parquet file and display summary
+  python etf_analyzer.py -i etf_data.parquet
+
+  # Load parquet and export as CSV
+  python etf_analyzer.py -i etf_data.parquet -f export -o etf_data.csv
+        """,
+    )
+
+    # Input options (mutually exclusive)
+    input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument(
+        "-d",
+        "--data",
+        metavar="DIR",
+        help="Directory containing ETF CSV files (*-etf-holdings.csv)",
+    )
+    input_group.add_argument(
+        "-i",
+        "--import",
+        dest="import_file",
+        metavar="FILE",
+        help="Import previously exported DataFrame file",
+    )
+
+    # Function to perform
+    parser.add_argument(
+        "-f",
+        "--function",
+        choices=["export", "summary", "list", "assets", "mapping"],
+        default="summary",
+        help="Operation to perform (default: summary)",
+    )
+
+    # Output file
+    parser.add_argument(
+        "-o",
+        "--output",
+        metavar="FILE",
+        help="Output file (if not specified, print to stdout)",
+    )
+
+    args = parser.parse_args()
+
+    # Validate arguments
+    if args.function == "export" and not args.output:
+        parser.error("-f export requires -o OUTPUT to be specified")
+
+    try:
+        # Initialize portfolio analyzer
+        portfolio = ETFPortfolioAnalyzer(".")
+
+        # Load data
+        if args.data:
+            print(f"Loading ETF data from directory: {args.data}")
+            portfolio.data_dir = Path(args.data)
+            portfolio.load_all_etfs()
+        elif args.import_file:
+            print(f"Importing DataFrame from: {args.import_file}")
+            portfolio.load_dataframe(args.import_file)
+
+        print()  # Blank line after loading messages
+
+        # Execute requested function
+        if args.function == "export":
+            portfolio.export_dataframe(args.output)
+
+        elif args.function == "summary":
+            summary = portfolio.get_etf_summary()
+            if args.output:
+                summary.to_csv(args.output, index=True)
+                print(f"Summary exported to: {args.output}")
+            else:
+                print("ETF Portfolio Summary")
+                print("=" * 60)
+                print(summary)
+                print()
+                print(f"Total ETFs: {len(summary)}")
+                total_holdings = summary["holdings_count"].sum()
+                print(f"Total holdings across all ETFs: {total_holdings}")
+
+        elif args.function == "list":
+            etf_list = portfolio.get_etf_list()
+            if args.output:
+                with open(args.output, "w") as f:
+                    for etf in etf_list:
+                        f.write(f"{etf}\n")
+                print(f"ETF list exported to: {args.output}")
+            else:
+                print("ETF List")
+                print("=" * 60)
+                for etf in etf_list:
+                    print(etf)
+                print()
+                print(f"Total ETFs: {len(etf_list)}")
+
+        elif args.function == "assets":
+            assets = portfolio.get_assets_with_etf_list()
+            if args.output:
+                assets.to_csv(args.output, index=False)
+                print(f"Asset list exported to: {args.output}")
+            else:
+                print("Assets Across All ETFs (sorted by symbol)")
+                print("=" * 60)
+                print(assets.to_string())
+                print()
+                print(f"Total unique assets: {len(assets)}")
+
+        elif args.function == "mapping":
+            mapping = portfolio.get_asset_to_etf_mapping()
+            if args.output:
+                # Export mapping as CSV with proper formatting
+                rows = []
+                for symbol, etfs in sorted(mapping.items()):
+                    rows.append(
+                        {"Symbol": symbol, "ETFs": ", ".join(etfs)}
+                    )
+                df = pd.DataFrame(rows)
+                df.to_csv(args.output, index=False)
+                print(f"Asset-to-ETF mapping exported to: {args.output}")
+            else:
+                print("Asset to ETF Mapping")
+                print("=" * 60)
+                for symbol, etfs in sorted(mapping.items()):
+                    print(f"{symbol}: {', '.join(etfs)}")
+                print()
+                print(f"Total unique assets: {len(mapping)}")
+
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
-    # Example usage
-    print("ETF Analyzer - Example Usage")
-    print("-" * 50)
-
-    print("\nOption 1: Analyze all ETFs in a directory")
-    print("=" * 50)
-    print("1. Place your ETF CSV files in the 'data/' directory")
-    print("   Format: {SYMBOL}-etf-holdings.csv")
-    print("   Examples: SPY-etf-holdings.csv, QQQ-etf-holdings.csv\n")
-    print("2. Run the following code:\n")
-    print("portfolio = ETFPortfolioAnalyzer('data')")
-    print("portfolio.load_all_etfs()")
-    print("print(portfolio.get_etf_summary())")
-    print("print(portfolio.get_etf_list())")
-
-    print("\n\nOption 2: Analyze a single ETF file")
-    print("=" * 50)
-    print("analyzer = ETFAnalyzer('data/SPY-etf-holdings.csv')")
-    print("analyzer.load_data()")
-    print("print(analyzer.get_summary_stats())")
-    print("print(analyzer.get_top_holdings(10))")
-
-    portfolio = ETFPortfolioAnalyzer("data")
-    portfolio.load_all_etfs()
-    print(portfolio.get_etf_summary())
-    print(portfolio.get_etf_list())
-
-    # Check available columns first
-    print("\nAvailable columns in VOT:")
-    print(portfolio.get_columns("VOT"))
-
-    # Get assets using default column names
-    print("\nVOT Assets (first 5):")
-    print(portfolio.get_etf_assets("VOT").head())
-
-    # Get all unique asset symbols
-    print("\nUnique assets count:")
-    unique_assets = portfolio.get_unique_assets()
-    print(f"Total unique assets: {len(unique_assets)}")
-    print(f"First 10: {unique_assets[:10]}")
-
-    # Get asset to ETF mapping
-    print("\nAsset to ETF mapping (showing AAPL as example):")
-    mapping = portfolio.get_asset_to_etf_mapping()
-    if "AAPL" in mapping:
-        print(f"AAPL is in: {mapping['AAPL']}")
-
-    # Get most common assets across all ETFs
-    print("\nMost common assets by ETF count (top 10):")
-    print(portfolio.get_assets_by_etf_count().head(10))
-    print("\nSorted list of assets to ETFs\n")
-    print(portfolio.get_assets_with_etf_list().head(10))
-
-    # write asset to ETF info to file
-    # print("Writing sorted asset to ETF data to asset_to_ETF.csv")
-    # portfolio.export_asset_analysis("asset_to_ETF.csv", sort_by="symbol")
+    main()

@@ -1,6 +1,6 @@
 # ETF Holdings Analyzer
 
-A Python project for analyzing ETF (Exchange-Traded Fund) CSV holdings files using pandas.
+A Python project for analyzing ETF (Exchange-Traded Fund) CSV holdings files using pandas.  The bulk of the code was generated with Vibe Coding to experiment with it and to meet the goal of processing ETF CSV data with a command line tool.
 
 ## Features
 

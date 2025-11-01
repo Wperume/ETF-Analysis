@@ -321,6 +321,7 @@ ETF-Analysis/
 ├── analysis/          # Place your output files here
 ├── data/              # Place your CSV files here
 ├── etf_analyzer.py    # Main analyzer class
+├── example-data/      # Example data files to play around with
 ├── requirements.txt   # Python dependencies
 ├── .gitignore
 └── README.md

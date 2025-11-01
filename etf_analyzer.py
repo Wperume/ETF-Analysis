@@ -28,17 +28,34 @@ class ETFAnalyzer:
         filename = self.csv_path.stem
         self.etf_name = filename.split("-etf-holdings")[0].upper()
 
-    def load_data(self, **kwargs) -> pd.DataFrame:
+    def load_data(
+        self, symbol_col: str = "Symbol", no_col: str = "No.", **kwargs
+    ) -> pd.DataFrame:
         """
         Load CSV data into a pandas DataFrame
 
         Args:
+            symbol_col: Column name containing asset symbols
+            no_col: Column name containing row numbers/indices
             **kwargs: Additional arguments to pass to pd.read_csv()
 
         Returns:
             Loaded DataFrame with ETF symbol added as a column
         """
-        df = pd.read_csv(self.csv_path, **kwargs)
+        # Preserve "n/a" as a literal string, not NaN
+        # Only treat empty strings and actual NaN as missing values
+        df = pd.read_csv(
+            self.csv_path, keep_default_na=False, na_values=[""], **kwargs
+        )
+
+        # Generate synthetic symbols for empty Symbol values
+        # Format: ETF_SYMBOL + No. (e.g., CANE1, CANE2)
+        if symbol_col in df.columns and no_col in df.columns:
+            empty_mask = (df[symbol_col] == "") | (df[symbol_col].isna())
+            df.loc[empty_mask, symbol_col] = (
+                self.etf_name + df.loc[empty_mask, no_col].astype(str)
+            )
+
         df.insert(0, "etf_symbol", self.etf_name)
         self.df = df
         print(f"Loaded {len(df)} holdings from {self.csv_path.name}")
@@ -239,10 +256,12 @@ class ETFPortfolioAnalyzer:
 
         # Add assets column if requested
         if include_assets and symbol_col in self.df.columns:
-            # Group by ETF and get list of asset symbols
+            # Group by ETF and get list of asset symbols (sorted, unique)
             assets_by_etf = (
                 self.df.groupby("etf_symbol")[symbol_col]
-                .apply(lambda x: ", ".join(sorted(x.astype(str).unique())))
+                .apply(
+                    lambda x: ", ".join(sorted(x.astype(str).unique()))
+                )
                 .rename("assets")
             )
             summary = summary.join(assets_by_etf)
@@ -643,7 +662,10 @@ class ETFPortfolioAnalyzer:
         if extension == ".parquet":
             df = pd.read_parquet(input_file)
         elif extension == ".csv":
-            df = pd.read_csv(input_file)
+            # Preserve "n/a" as literal string, not NaN
+            df = pd.read_csv(
+                input_file, keep_default_na=False, na_values=[""]
+            )
         elif extension in [".pkl", ".pickle"]:
             df = pd.read_pickle(input_file)
         else:
@@ -745,6 +767,40 @@ def load_config() -> dict:
             defaults["shares_col"] = section["shares_col"]
 
     return defaults
+
+
+def check_file_overwrite(output_path: str, force: bool = False) -> bool:
+    """
+    Check if output file exists and prompt user for overwrite permission.
+
+    Args:
+        output_path: Path to output file
+        force: If True, skip prompt and allow overwrite
+
+    Returns:
+        True if file should be written, False if operation should be
+        cancelled
+    """
+    from pathlib import Path
+
+    if not Path(output_path).exists():
+        return True
+
+    if force:
+        return True
+
+    # Prompt user
+    while True:
+        response = input(
+            f"File '{output_path}' already exists. "
+            f"Overwrite? (y/n): "
+        ).lower()
+        if response in ["y", "yes"]:
+            return True
+        elif response in ["n", "no"]:
+            return False
+        else:
+            print("Please enter 'y' or 'n'")
 
 
 def add_default_extension(
@@ -907,6 +963,13 @@ Configuration File:
         help="Column name for shares (default: Shares)",
     )
 
+    # Force overwrite flag
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force overwrite of existing output files without prompting",
+    )
+
     args = parser.parse_args()
 
     # Add default extension to output file if needed
@@ -917,6 +980,11 @@ Configuration File:
     if args.function == "export" and not args.output:
         parser.error("-f export requires -o OUTPUT to be specified")
 
+    # Check if output file exists and prompt for overwrite
+    if args.output and not check_file_overwrite(args.output, args.force):
+        print("Operation cancelled.")
+        sys.exit(0)
+
     try:
         # Initialize portfolio analyzer
         portfolio = ETFPortfolioAnalyzer(".")
@@ -925,7 +993,7 @@ Configuration File:
         if args.data:
             print(f"Loading ETF data from directory: {args.data}")
             portfolio.data_dir = Path(args.data)
-            portfolio.load_all_etfs()
+            portfolio.load_all_etfs(symbol_col=args.symbol_col)
         elif args.import_file:
             print(f"Importing DataFrame from: {args.import_file}")
             portfolio.load_dataframe(args.import_file)
@@ -940,7 +1008,8 @@ Configuration File:
 
         elif args.function == "summary":
             summary = portfolio.get_etf_summary(
-                symbol_col=args.symbol_col, include_assets=args.output is not None
+                symbol_col=args.symbol_col,
+                include_assets=args.output is not None,
             )
             if args.output:
                 summary.to_csv(args.output, index=True)
@@ -1031,9 +1100,9 @@ Configuration File:
                 symbol_col=args.symbol_col, name_col=args.name_col
             )
             overlap_assets = assets[assets["ETF_Count"] > 1]
-            # Sort by ETF_Count descending for better readability
+            # Sort by ETF_Count descending, then by Symbol ascending
             overlap_assets = overlap_assets.sort_values(
-                "ETF_Count", ascending=False
+                ["ETF_Count", args.symbol_col], ascending=[False, True]
             )
             overlap_assets = overlap_assets.reset_index(drop=True)
             if args.output:

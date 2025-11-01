@@ -82,6 +82,9 @@ python etf_analyzer.py -d data -f summary -o summary.csv
 
 # Use custom column names (if your CSV has different column names)
 python etf_analyzer.py -d data -f assets --symbol-col ticker --name-col company
+
+# Force overwrite existing file (useful for automated scripts)
+python etf_analyzer.py -d data -f summary -o summary.csv --force
 ```
 
 **Command-Line Options:**
@@ -100,12 +103,14 @@ python etf_analyzer.py -d data -f assets --symbol-col ticker --name-col company
 - `--name-col COLUMN`: Column name for asset name (default: Name)
 - `--weight-col COLUMN`: Column name for weight/percentage (default: % Weight)
 - `--shares-col COLUMN`: Column name for shares (default: Shares)
+- `--force`: Force overwrite of existing output files without prompting
 
 **Notes:**
 - Either `-d` or `-i` must be specified (unless `data_dir` is set in config file)
 - The `-o` option is required for `-f export`
 - Column overrides (`--symbol-col`, etc.) are useful when your CSV files use different column names
 - Only specify the column overrides you need; others will use defaults
+- **File Overwrite Protection**: If the output file exists, you'll be prompted to confirm overwrite. Use `--force` to skip the prompt for automated scripts.
 
 **Default File Extensions:**
 

@@ -31,6 +31,13 @@ wheels/
 
 # Data files - ignore all directories starting with "data"
 data*/
+# But track the data folder itself (with .gitkeep)
+!data/
+!data/.gitkeep
+# Ignore all files in data folder
+data/*
+# But keep the .gitkeep file
+!data/.gitkeep
 
 # Analysis files - ignore all directories starting with "analysis"
 analysis*/

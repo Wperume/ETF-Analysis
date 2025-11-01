@@ -32,6 +32,9 @@ wheels/
 # Data files - ignore all directories starting with "data"
 data*/
 
+# Analysis files - ignore all directories starting with "analysis"
+analysis*/
+
 # Jupyter Notebook
 .ipynb_checkpoints
 

@@ -34,6 +34,13 @@ data*/
 
 # Analysis files - ignore all directories starting with "analysis"
 analysis*/
+# But track the analysis folder itself (with .gitkeep)
+!analysis/
+!analysis/.gitkeep
+# Ignore all files in analysis folder
+analysis/*
+# But keep the .gitkeep file
+!analysis/.gitkeep
 
 # Jupyter Notebook
 .ipynb_checkpoints

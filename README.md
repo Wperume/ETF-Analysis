@@ -88,7 +88,7 @@ python etf_analyzer.py -d data -f assets --symbol-col ticker --name-col company
 - `-d DIR` or `--data DIR`: Directory containing ETF CSV files
 - `-i FILE` or `--import FILE`: Import previously exported DataFrame
 - `-f FUNCTION` or `--function FUNCTION`: Operation to perform
-  - `summary` (default): Display ETF portfolio summary
+  - `summary` (default): Display ETF portfolio summary (CSV export includes asset lists)
   - `list`: List all ETF symbols
   - `assets`: Show all assets with ETF associations (sorted by symbol)
   - `unique`: Show assets that appear in only one ETF (ETF_Count = 1)
@@ -106,6 +106,33 @@ python etf_analyzer.py -d data -f assets --symbol-col ticker --name-col company
 - The `-o` option is required for `-f export`
 - Column overrides (`--symbol-col`, etc.) are useful when your CSV files use different column names
 - Only specify the column overrides you need; others will use defaults
+
+**Default File Extensions:**
+
+If you don't specify a file extension with `-o`, the appropriate extension will be added automatically based on the function:
+
+| Function | Default Extension | Format |
+|----------|------------------|--------|
+| `export` | `.parquet` | Parquet binary format (efficient, preserves types) |
+| `summary` | `.csv` | CSV with ETF summary statistics and asset lists |
+| `list` | `.txt` | Plain text list of ETF symbols |
+| `assets` | `.csv` | CSV with asset details and ETF associations |
+| `mapping` | `.csv` | CSV with asset-to-ETF mapping |
+| `unique` | `.csv` | CSV with assets unique to one ETF |
+| `overlap` | `.csv` | CSV with assets in multiple ETFs |
+
+Examples:
+```bash
+# These are equivalent - both create test.parquet
+python etf_analyzer.py -d data -f export -o test
+python etf_analyzer.py -d data -f export -o test.parquet
+
+# Override default: create CSV instead of parquet
+python etf_analyzer.py -d data -f export -o test.csv
+
+# Auto-adds .txt extension
+python etf_analyzer.py -d data -f list -o etf_list
+```
 
 **Configuration File:**
 

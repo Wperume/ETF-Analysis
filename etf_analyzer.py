@@ -216,9 +216,16 @@ class ETFPortfolioAnalyzer:
         """Get list of ETF symbols that have been loaded"""
         return list(self.etf_analyzers.keys())
 
-    def get_etf_summary(self) -> pd.DataFrame:
+    def get_etf_summary(
+        self, symbol_col: str = "Symbol", include_assets: bool = True
+    ) -> pd.DataFrame:
         """
         Get summary statistics for each ETF
+
+        Args:
+            symbol_col: Column name containing asset symbols
+            include_assets: If True, include comma-separated list of
+                assets in the summary
 
         Returns:
             DataFrame with ETF summary statistics
@@ -229,6 +236,17 @@ class ETFPortfolioAnalyzer:
         summary = self.df.groupby("etf_symbol").agg(
             holdings_count=("etf_symbol", "count")
         )
+
+        # Add assets column if requested
+        if include_assets and symbol_col in self.df.columns:
+            # Group by ETF and get list of asset symbols
+            assets_by_etf = (
+                self.df.groupby("etf_symbol")[symbol_col]
+                .apply(lambda x: ", ".join(sorted(x.astype(str).unique())))
+                .rename("assets")
+            )
+            summary = summary.join(assets_by_etf)
+
         return summary
 
     def filter_by_etf(self, etf_symbol: str) -> pd.DataFrame:
@@ -729,6 +747,46 @@ def load_config() -> dict:
     return defaults
 
 
+def add_default_extension(
+    output_path: Optional[str], function: str
+) -> Optional[str]:
+    """
+    Add default file extension based on function if not already present.
+
+    Args:
+        output_path: Output file path (may be None)
+        function: Function being executed
+
+    Returns:
+        Output path with appropriate extension, or None if output_path
+        is None
+    """
+    if output_path is None:
+        return None
+
+    from pathlib import Path
+
+    path = Path(output_path)
+
+    # If path already has an extension, return as-is
+    if path.suffix:
+        return output_path
+
+    # Add extension based on function
+    extension_map = {
+        "export": ".parquet",  # Default for DataFrame export
+        "summary": ".csv",
+        "list": ".txt",
+        "assets": ".csv",
+        "mapping": ".csv",
+        "unique": ".csv",
+        "overlap": ".csv",
+    }
+
+    default_ext = extension_map.get(function, ".txt")
+    return str(path) + default_ext
+
+
 def main():
     """
     Command-line interface for ETF Analyzer
@@ -851,6 +909,10 @@ Configuration File:
 
     args = parser.parse_args()
 
+    # Add default extension to output file if needed
+    if args.output:
+        args.output = add_default_extension(args.output, args.function)
+
     # Validate arguments
     if args.function == "export" and not args.output:
         parser.error("-f export requires -o OUTPUT to be specified")
@@ -872,20 +934,28 @@ Configuration File:
 
         # Execute requested function
         if args.function == "export":
+            # Type assertion: output is guaranteed to be str by validation
+            assert args.output is not None
             portfolio.export_dataframe(args.output)
 
         elif args.function == "summary":
-            summary = portfolio.get_etf_summary()
+            summary = portfolio.get_etf_summary(
+                symbol_col=args.symbol_col, include_assets=args.output is not None
+            )
             if args.output:
                 summary.to_csv(args.output, index=True)
                 print(f"Summary exported to: {args.output}")
             else:
+                # For stdout, don't include assets (too verbose)
+                summary_no_assets = portfolio.get_etf_summary(
+                    symbol_col=args.symbol_col, include_assets=False
+                )
                 print("ETF Portfolio Summary")
                 print("=" * 60)
-                print(summary)
+                print(summary_no_assets)
                 print()
-                print(f"Total ETFs: {len(summary)}")
-                total_holdings = summary["holdings_count"].sum()
+                print(f"Total ETFs: {len(summary_no_assets)}")
+                total_holdings = summary_no_assets["holdings_count"].sum()
                 print(f"Total holdings across all ETFs: {total_holdings}")
 
         elif args.function == "list":

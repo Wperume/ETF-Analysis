@@ -318,12 +318,17 @@ MSFT,Microsoft Corporation,4.8,Technology,900000,310000000
 
 ```
 ETF-Analysis/
+├── analysis/          # Place your output files here
 ├── data/              # Place your CSV files here
 ├── etf_analyzer.py    # Main analyzer class
 ├── requirements.txt   # Python dependencies
 ├── .gitignore
 └── README.md
 ```
+"data*/" and "analysis*/" in .gitignore will allow for multiple
+data and analysis directories as long as they start with these 
+prefixes
+
 
 ## Dependencies
 

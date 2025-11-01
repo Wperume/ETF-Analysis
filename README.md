@@ -85,6 +85,18 @@ python etf_analyzer.py -d data -f assets --symbol-col ticker --name-col company
 
 # Force overwrite existing file (useful for automated scripts)
 python etf_analyzer.py -d data -f summary -o summary.csv --force
+
+# Sort assets alphabetically in summary (default is by weight)
+python etf_analyzer.py -d data -f summary -o summary_alpha.csv --sort-assets alpha
+
+# Sort assets by weight (descending) in summary (this is the default)
+python etf_analyzer.py -d data -f summary -o summary_weight.csv --sort-assets weight
+
+# Sort ETFs alphabetically in overlap output (default is by weight)
+python etf_analyzer.py -d data -f overlap -o overlap_alpha.csv --sort-etfs alpha
+
+# Sort ETFs by asset weight in overlap output (this is the default)
+python etf_analyzer.py -d data -f overlap -o overlap_weight.csv --sort-etfs weight
 ```
 
 **Command-Line Options:**
@@ -103,6 +115,8 @@ python etf_analyzer.py -d data -f summary -o summary.csv --force
 - `--name-col COLUMN`: Column name for asset name (default: Name)
 - `--weight-col COLUMN`: Column name for weight/percentage (default: % Weight)
 - `--shares-col COLUMN`: Column name for shares (default: Shares)
+- `--sort-assets {weight,alpha}`: Sort assets by weight (default) or alphabetically (for summary function)
+- `--sort-etfs {weight,alpha}`: Sort ETFs by asset weight (default) or alphabetically (for overlap function)
 - `--force`: Force overwrite of existing output files without prompting
 
 **Notes:**
@@ -111,6 +125,18 @@ python etf_analyzer.py -d data -f summary -o summary.csv --force
 - Column overrides (`--symbol-col`, etc.) are useful when your CSV files use different column names
 - Only specify the column overrides you need; others will use defaults
 - **File Overwrite Protection**: If the output file exists, you'll be prompted to confirm overwrite. Use `--force` to skip the prompt for automated scripts.
+
+**Sorting Options:**
+
+- **`--sort-assets {weight,alpha}`** (for `summary` function):
+  - `weight` (default): Sorts assets within each ETF by their percentage weight (descending), showing the largest holdings first
+  - `alpha`: Sorts assets alphabetically by symbol
+  - Example use case: Use `weight` to see which stocks have the highest allocation in each ETF, or use `alpha` for easier lookup
+
+- **`--sort-etfs {weight,alpha}`** (for `overlap` function):
+  - `weight` (default): For each asset, sorts the ETFs by that asset's weight within each ETF (descending), showing which ETF has the highest allocation first
+  - `alpha`: Sorts ETFs alphabetically by symbol
+  - Example use case: Use `weight` to see which ETF has the highest concentration of a particular stock, or use `alpha` for consistent ordering
 
 **Default File Extensions:**
 

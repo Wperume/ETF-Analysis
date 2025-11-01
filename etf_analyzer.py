@@ -48,10 +48,15 @@ class ETFAnalyzer:
             self.csv_path, keep_default_na=False, na_values=[""], **kwargs
         )
 
-        # Generate synthetic symbols for empty Symbol values
+        # Generate synthetic symbols for empty or invalid Symbol values
+        # Treat empty strings, NaN, and ":" as missing symbols
         # Format: ETF_SYMBOL + No. (e.g., CANE1, CANE2)
         if symbol_col in df.columns and no_col in df.columns:
-            empty_mask = (df[symbol_col] == "") | (df[symbol_col].isna())
+            empty_mask = (
+                (df[symbol_col] == "")
+                | (df[symbol_col].isna())
+                | (df[symbol_col] == ":")
+            )
             df.loc[empty_mask, symbol_col] = (
                 self.etf_name + df.loc[empty_mask, no_col].astype(str)
             )
@@ -234,15 +239,22 @@ class ETFPortfolioAnalyzer:
         return list(self.etf_analyzers.keys())
 
     def get_etf_summary(
-        self, symbol_col: str = "Symbol", include_assets: bool = True
+        self,
+        symbol_col: str = "Symbol",
+        weight_col: str = "% Weight",
+        include_assets: bool = True,
+        sort_by: str = "weight",
     ) -> pd.DataFrame:
         """
         Get summary statistics for each ETF
 
         Args:
             symbol_col: Column name containing asset symbols
+            weight_col: Column name containing asset weights/percentages
             include_assets: If True, include comma-separated list of
                 assets in the summary
+            sort_by: Sort assets by "weight" (descending) or "alpha"
+                (alphabetically)
 
         Returns:
             DataFrame with ETF summary statistics
@@ -256,14 +268,63 @@ class ETFPortfolioAnalyzer:
 
         # Add assets column if requested
         if include_assets and symbol_col in self.df.columns:
-            # Group by ETF and get list of asset symbols (sorted, unique)
-            assets_by_etf = (
-                self.df.groupby("etf_symbol")[symbol_col]
-                .apply(
-                    lambda x: ", ".join(sorted(x.astype(str).unique()))
+            if sort_by == "alpha":
+                # Alphabetical sorting
+                assets_by_etf = (
+                    self.df.groupby("etf_symbol")[symbol_col]
+                    .apply(
+                        lambda x: ", ".join(
+                            sorted(x.astype(str).unique())
+                        )
+                    )
+                    .rename("assets")
                 )
-                .rename("assets")
-            )
+            else:
+                # Weight-based sorting (default)
+                def format_assets_by_weight(group):
+                    # Get access to both columns via full DataFrame
+                    if (
+                        weight_col in group.index.names
+                        or weight_col in self.df.columns
+                    ):
+                        # Get the full rows for this ETF
+                        etf_symbol = group.name
+                        etf_rows = self.df[
+                            self.df["etf_symbol"] == etf_symbol
+                        ]
+
+                        # Convert weight to numeric, handling %
+                        weights = (
+                            etf_rows[weight_col]
+                            .astype(str)
+                            .str.replace("%", "")
+                            .str.replace(",", "")
+                        )
+                        weights = pd.to_numeric(
+                            weights, errors="coerce"
+                        ).fillna(0)
+
+                        # Sort by weight descending
+                        sorted_indices = weights.argsort()[::-1]
+                        sorted_symbols = (
+                            etf_rows.iloc[sorted_indices][symbol_col]
+                            .astype(str)
+                            .unique()
+                        )
+
+                        return ", ".join(sorted_symbols)
+                    else:
+                        # Fallback to alphabetical if no weight
+                        return ", ".join(
+                            sorted(group.astype(str).unique())
+                        )
+
+                assets_by_etf = (
+                    self.df.groupby("etf_symbol")[symbol_col]
+                    .apply(format_assets_by_weight)
+                    .rename("assets")
+                )
+
             summary = summary.join(assets_by_etf)
 
         return summary
@@ -505,7 +566,11 @@ class ETFPortfolioAnalyzer:
         return result_df
 
     def get_assets_with_etf_list(
-        self, symbol_col: str = "Symbol", name_col: str = "Name"
+        self,
+        symbol_col: str = "Symbol",
+        name_col: str = "Name",
+        sort_etfs_by: str = "alpha",
+        weight_col: str = "% Weight",
     ) -> pd.DataFrame:
         """
         Get all assets with their ETF associations, sorted by symbol
@@ -513,6 +578,10 @@ class ETFPortfolioAnalyzer:
         Args:
             symbol_col: Name of the asset symbol column
             name_col: Name of the asset name column
+            sort_etfs_by: How to sort ETFs for each asset -
+                "alpha" for alphabetical (default),
+                "weight" for by asset weight in each ETF
+            weight_col: Name of the weight column (for weight sorting)
 
         Returns:
             DataFrame with columns: Symbol, Name, ETF_Count, ETFs
@@ -531,12 +600,54 @@ class ETFPortfolioAnalyzer:
             asset_data = self.df[self.df[symbol_col] == symbol].iloc[0]
             name = asset_data.get(name_col, "N/A")
 
+            # Sort ETFs based on the chosen method
+            if sort_etfs_by == "alpha":
+                # Alphabetical sorting (current behavior)
+                sorted_etfs = sorted(etfs)
+            else:
+                # Weight-based sorting - sort by weight descending
+                # Get weight for this asset in each ETF
+                etf_weights = []
+                for etf in etfs:
+                    # Find this asset's weight in this ETF
+                    asset_in_etf = self.df[
+                        (self.df[symbol_col] == symbol)
+                        & (self.df["etf_symbol"] == etf)
+                    ]
+                    has_weight = (
+                        not asset_in_etf.empty
+                        and weight_col in self.df.columns
+                    )
+                    if has_weight:
+                        weight_str = asset_in_etf.iloc[0].get(
+                            weight_col, "0%"
+                        )
+                        # Parse percentage string to float
+                        try:
+                            weight_val = float(
+                                str(weight_str).replace("%", "").strip()
+                            )
+                        except (ValueError, AttributeError):
+                            weight_val = 0.0
+                    else:
+                        weight_val = 0.0
+
+                    etf_weights.append((etf, weight_val))
+
+                # Sort by weight descending, then alphabetically
+                sorted_etfs = [
+                    etf
+                    for etf, _ in sorted(
+                        etf_weights, key=lambda x: (-x[1], x[0])
+                    )
+                ]
+
             results.append(
                 {
                     "Symbol": symbol,
                     "Name": name,
                     "ETF_Count": len(etfs),
-                    "ETFs": ", ".join(etfs),
+                    "ETFs": ", ".join(sorted_etfs),
                 }
             )
 
@@ -963,6 +1074,22 @@ Configuration File:
         help="Column name for shares (default: Shares)",
     )
 
+    # Asset sorting option
+    parser.add_argument(
+        "--sort-assets",
+        choices=["weight", "alpha"],
+        default="weight",
+        help="Sort assets by weight (default) or alphabetically",
+    )
+
+    # ETF sorting option for overlap function
+    parser.add_argument(
+        "--sort-etfs",
+        choices=["weight", "alpha"],
+        default="weight",
+        help="Sort ETFs in overlap by weight (default) or alphabetically",
+    )
+
     # Force overwrite flag
     parser.add_argument(
         "--force",
@@ -1009,7 +1136,9 @@ Configuration File:
         elif args.function == "summary":
             summary = portfolio.get_etf_summary(
                 symbol_col=args.symbol_col,
+                weight_col=args.weight_col,
                 include_assets=args.output is not None,
+                sort_by=args.sort_assets,
             )
             if args.output:
                 summary.to_csv(args.output, index=True)
@@ -1017,7 +1146,10 @@ Configuration File:
             else:
                 # For stdout, don't include assets (too verbose)
                 summary_no_assets = portfolio.get_etf_summary(
-                    symbol_col=args.symbol_col, include_assets=False
+                    symbol_col=args.symbol_col,
+                    weight_col=args.weight_col,
+                    include_assets=False,
+                    sort_by=args.sort_assets,
                 )
                 print("ETF Portfolio Summary")
                 print("=" * 60)
@@ -1097,7 +1229,10 @@ Configuration File:
         elif args.function == "overlap":
             # Get assets that appear in more than one ETF (ETF_Count > 1)
             assets = portfolio.get_assets_with_etf_list(
-                symbol_col=args.symbol_col, name_col=args.name_col
+                symbol_col=args.symbol_col,
+                name_col=args.name_col,
+                sort_etfs_by=args.sort_etfs,
+                weight_col=args.weight_col,
             )
             overlap_assets = assets[assets["ETF_Count"] > 1]
             # Sort by ETF_Count descending, then by Symbol ascending

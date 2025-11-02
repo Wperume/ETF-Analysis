@@ -1551,31 +1551,32 @@ Configuration File:
                     # Alphabetical sort
                     all_common = sorted(list(common_all))
                 else:
-                    # Sort by weight in first ETF (descending)
-                    first_etf = etf_list[0]
-                    first_etf_data = portfolio.df[
-                        portfolio.df["etf_symbol"] == first_etf
-                    ]
-                    # Create a weight map for common assets
+                    # Sort by sum of weights across all ETFs (descending)
                     weight_map = {}
                     for asset in common_all:
-                        asset_row = first_etf_data[
-                            first_etf_data[args.symbol_col] == asset
-                        ]
-                        if not asset_row.empty:
-                            weight_str = asset_row.iloc[0].get(
-                                args.weight_col, "0%"
-                            )
-                            try:
-                                weight = float(
-                                    str(weight_str).replace("%", "").strip()
+                        total_weight = 0.0
+                        for etf in etf_list:
+                            etf_data = portfolio.df[
+                                portfolio.df["etf_symbol"] == etf
+                            ]
+                            asset_row = etf_data[
+                                etf_data[args.symbol_col] == asset
+                            ]
+                            if not asset_row.empty:
+                                weight_str = asset_row.iloc[0].get(
+                                    args.weight_col, "0%"
                                 )
-                            except (ValueError, AttributeError):
-                                weight = 0.0
-                            weight_map[asset] = weight
-                        else:
-                            weight_map[asset] = 0.0
-                    # Sort by weight descending
+                                try:
+                                    weight = float(
+                                        str(weight_str)
+                                        .replace("%", "")
+                                        .strip()
+                                    )
+                                except (ValueError, AttributeError):
+                                    weight = 0.0
+                                total_weight += weight
+                        weight_map[asset] = total_weight
+                    # Sort by total weight descending
                     all_common = sorted(
                         common_all, key=lambda x: weight_map[x], reverse=True
                     )

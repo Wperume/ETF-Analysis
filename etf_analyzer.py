@@ -52,9 +52,11 @@ class ETFAnalyzer:
         # Treat empty strings, NaN, and ":" as missing symbols
         # Format: ETF_SYMBOL + No. (e.g., CANE1, CANE2)
         if symbol_col in df.columns and no_col in df.columns:
+            # Convert Symbol column to string dtype to avoid dtype warning
+            df[symbol_col] = df[symbol_col].astype(str)
             empty_mask = (
                 (df[symbol_col] == "")
-                | (df[symbol_col].isna())
+                | (df[symbol_col] == "nan")
                 | (df[symbol_col] == ":")
             )
             df.loc[empty_mask, symbol_col] = (
@@ -1390,205 +1392,233 @@ Configuration File:
                 sort_by=args.sort_assets,
             )
 
+            # Display comparison summary to stdout
+            print(f"ETF Comparison: {', '.join(etf_list)}")
+            print("=" * 60)
+            print()
+
+            # Calculate statistics for each ETF
+            stats_data = {}
+            for etf in etf_list:
+                etf_holdings = portfolio.df[
+                    portfolio.df["etf_symbol"] == etf
+                ]
+                holdings_count = len(etf_holdings)
+
+                # Count overlapped assets (in any other compared ETF)
+                etf_assets = set(
+                    etf_holdings[args.symbol_col].unique()
+                )
+                other_etfs = [e for e in etf_list if e != etf]
+                other_assets = set(
+                    portfolio.df[
+                        portfolio.df["etf_symbol"].isin(other_etfs)
+                    ][args.symbol_col].unique()
+                )
+                overlapped_assets = etf_assets & other_assets
+                overlap_count = len(overlapped_assets)
+                overlap_count_pct = (
+                    (overlap_count / holdings_count * 100)
+                    if holdings_count > 0
+                    else 0
+                )
+
+                # Calculate weight-based overlap
+                total_weight = 0.0
+                overlapped_weight = 0.0
+                unique_weight = 0.0
+
+                for _, row in etf_holdings.iterrows():
+                    asset = row[args.symbol_col]
+                    weight_str = row.get(args.weight_col, "0%")
+                    try:
+                        weight = float(
+                            str(weight_str).replace("%", "").strip()
+                        )
+                    except (ValueError, AttributeError):
+                        weight = 0.0
+
+                    total_weight += weight
+                    if asset in overlapped_assets:
+                        overlapped_weight += weight
+                    else:
+                        unique_weight += weight
+
+                overlap_weight_pct = (
+                    (overlapped_weight / total_weight * 100)
+                    if total_weight > 0
+                    else 0
+                )
+                unique_weight_pct = (
+                    (unique_weight / total_weight * 100)
+                    if total_weight > 0
+                    else 0
+                )
+
+                stats_data[etf] = {
+                    "holdings": holdings_count,
+                    "overlapped_count": overlap_count,
+                    "overlap_count_pct": overlap_count_pct,
+                    "unique_count": holdings_count - overlap_count,
+                    "overlapped_weight": overlapped_weight,
+                    "overlap_weight_pct": overlap_weight_pct,
+                    "unique_weight": unique_weight,
+                    "unique_weight_pct": unique_weight_pct,
+                }
+
+            # Print stats table
+            print(f"{'':20}", end="")
+            for etf in etf_list:
+                print(f"{etf:>12}", end="")
+            print()
+
+            print(f"{'Holdings Count':20}", end="")
+            for etf in etf_list:
+                print(f"{stats_data[etf]['holdings']:>12}", end="")
+            print()
+            print()
+
+            # Count-based overlap statistics
+            print("By Asset Count:")
+            print(f"{'  Overlapped Assets':20}", end="")
+            for etf in etf_list:
+                count = stats_data[etf]['overlapped_count']
+                print(f"{count:>12}", end="")
+            print()
+
+            print(f"{'  Overlap %':20}", end="")
+            for etf in etf_list:
+                pct = stats_data[etf]['overlap_count_pct']
+                print(f"{pct:>11.1f}%", end="")
+            print()
+
+            print(f"{'  Unique Assets':20}", end="")
+            for etf in etf_list:
+                count = stats_data[etf]['unique_count']
+                print(f"{count:>12}", end="")
+            print()
+
+            print(f"{'  Unique %':20}", end="")
+            for etf in etf_list:
+                unique_pct = 100 - stats_data[etf]['overlap_count_pct']
+                print(f"{unique_pct:>11.1f}%", end="")
+            print()
+            print()
+
+            # Weight-based overlap statistics
+            print("By Weight:")
+            print(f"{'  Overlapped Weight':20}", end="")
+            for etf in etf_list:
+                weight = stats_data[etf]['overlapped_weight']
+                print(f"{weight:>11.1f}%", end="")
+            print()
+
+            print(f"{'  Overlap %':20}", end="")
+            for etf in etf_list:
+                pct = stats_data[etf]['overlap_weight_pct']
+                print(f"{pct:>11.1f}%", end="")
+            print()
+
+            print(f"{'  Unique Weight':20}", end="")
+            for etf in etf_list:
+                weight = stats_data[etf]['unique_weight']
+                print(f"{weight:>11.1f}%", end="")
+            print()
+
+            print(f"{'  Unique %':20}", end="")
+            for etf in etf_list:
+                pct = stats_data[etf]['unique_weight_pct']
+                print(f"{pct:>11.1f}%", end="")
+            print()
+            print()
+
+            # Find common holdings across all ETFs
+            all_asset_sets = [
+                set(
+                    portfolio.df[portfolio.df["etf_symbol"] == etf][
+                        args.symbol_col
+                    ].unique()
+                )
+                for etf in etf_list
+            ]
+            common_all = set.intersection(*all_asset_sets)
+            print(
+                f"Common Holdings (in all {len(etf_list)} ETFs): "
+                f"{len(common_all)} assets"
+            )
+            if len(common_all) > 0:
+                if args.sort_assets == "alpha":
+                    # Alphabetical sort
+                    all_common = sorted(list(common_all))
+                else:
+                    # Sort by weight in first ETF (descending)
+                    first_etf = etf_list[0]
+                    first_etf_data = portfolio.df[
+                        portfolio.df["etf_symbol"] == first_etf
+                    ]
+                    # Create a weight map for common assets
+                    weight_map = {}
+                    for asset in common_all:
+                        asset_row = first_etf_data[
+                            first_etf_data[args.symbol_col] == asset
+                        ]
+                        if not asset_row.empty:
+                            weight_str = asset_row.iloc[0].get(
+                                args.weight_col, "0%"
+                            )
+                            try:
+                                weight = float(
+                                    str(weight_str).replace("%", "").strip()
+                                )
+                            except (ValueError, AttributeError):
+                                weight = 0.0
+                            weight_map[asset] = weight
+                        else:
+                            weight_map[asset] = 0.0
+                    # Sort by weight descending
+                    all_common = sorted(
+                        common_all, key=lambda x: weight_map[x], reverse=True
+                    )
+                print(f"  {', '.join(all_common)}")
+            print()
+
+            # Count assets by how many ETFs they appear in
+            from collections import Counter
+
+            asset_etf_count = Counter()
+            for etf in etf_list:
+                etf_assets = portfolio.df[
+                    portfolio.df["etf_symbol"] == etf
+                ][args.symbol_col].unique()
+                for asset in etf_assets:
+                    asset_etf_count[asset] += 1
+
+            for count in range(len(etf_list) - 1, 0, -1):
+                assets_in_n = [
+                    asset
+                    for asset, c in asset_etf_count.items()
+                    if c == count
+                ]
+                if len(assets_in_n) > 0:
+                    print(
+                        f"Assets in {count} ETF"
+                        f"{'s' if count > 1 else ''}: "
+                        f"{len(assets_in_n)} assets"
+                    )
+
+            print()
+
+            # Show unique assets for each ETF
+            for etf in etf_list:
+                unique_count = stats_data[etf]["unique_count"]
+                if unique_count > 0:
+                    print(f"Unique to {etf}: {unique_count} assets")
+
+            # Export to CSV if output file specified
             if args.output:
-                # Export to CSV
+                print()
                 comparison.to_csv(args.output, index=False)
                 print(f"ETF comparison exported to: {args.output}")
-            else:
-                # Display comparison summary to stdout
-                print(f"ETF Comparison: {', '.join(etf_list)}")
-                print("=" * 60)
-                print()
-
-                # Calculate statistics for each ETF
-                stats_data = {}
-                for etf in etf_list:
-                    etf_holdings = portfolio.df[
-                        portfolio.df["etf_symbol"] == etf
-                    ]
-                    holdings_count = len(etf_holdings)
-
-                    # Count overlapped assets (in any other compared ETF)
-                    etf_assets = set(
-                        etf_holdings[args.symbol_col].unique()
-                    )
-                    other_etfs = [e for e in etf_list if e != etf]
-                    other_assets = set(
-                        portfolio.df[
-                            portfolio.df["etf_symbol"].isin(other_etfs)
-                        ][args.symbol_col].unique()
-                    )
-                    overlapped_assets = etf_assets & other_assets
-                    overlap_count = len(overlapped_assets)
-                    overlap_count_pct = (
-                        (overlap_count / holdings_count * 100)
-                        if holdings_count > 0
-                        else 0
-                    )
-
-                    # Calculate weight-based overlap
-                    total_weight = 0.0
-                    overlapped_weight = 0.0
-                    unique_weight = 0.0
-
-                    for _, row in etf_holdings.iterrows():
-                        asset = row[args.symbol_col]
-                        weight_str = row.get(args.weight_col, "0%")
-                        try:
-                            weight = float(
-                                str(weight_str).replace("%", "").strip()
-                            )
-                        except (ValueError, AttributeError):
-                            weight = 0.0
-
-                        total_weight += weight
-                        if asset in overlapped_assets:
-                            overlapped_weight += weight
-                        else:
-                            unique_weight += weight
-
-                    overlap_weight_pct = (
-                        (overlapped_weight / total_weight * 100)
-                        if total_weight > 0
-                        else 0
-                    )
-                    unique_weight_pct = (
-                        (unique_weight / total_weight * 100)
-                        if total_weight > 0
-                        else 0
-                    )
-
-                    stats_data[etf] = {
-                        "holdings": holdings_count,
-                        "overlapped_count": overlap_count,
-                        "overlap_count_pct": overlap_count_pct,
-                        "unique_count": holdings_count - overlap_count,
-                        "overlapped_weight": overlapped_weight,
-                        "overlap_weight_pct": overlap_weight_pct,
-                        "unique_weight": unique_weight,
-                        "unique_weight_pct": unique_weight_pct,
-                    }
-
-                # Print stats table
-                print(f"{'':20}", end="")
-                for etf in etf_list:
-                    print(f"{etf:>12}", end="")
-                print()
-
-                print(f"{'Holdings Count':20}", end="")
-                for etf in etf_list:
-                    print(f"{stats_data[etf]['holdings']:>12}", end="")
-                print()
-                print()
-
-                # Count-based overlap statistics
-                print("By Asset Count:")
-                print(f"{'  Overlapped Assets':20}", end="")
-                for etf in etf_list:
-                    count = stats_data[etf]['overlapped_count']
-                    print(f"{count:>12}", end="")
-                print()
-
-                print(f"{'  Overlap %':20}", end="")
-                for etf in etf_list:
-                    pct = stats_data[etf]['overlap_count_pct']
-                    print(f"{pct:>11.1f}%", end="")
-                print()
-
-                print(f"{'  Unique Assets':20}", end="")
-                for etf in etf_list:
-                    count = stats_data[etf]['unique_count']
-                    print(f"{count:>12}", end="")
-                print()
-
-                print(f"{'  Unique %':20}", end="")
-                for etf in etf_list:
-                    unique_pct = 100 - stats_data[etf]['overlap_count_pct']
-                    print(f"{unique_pct:>11.1f}%", end="")
-                print()
-                print()
-
-                # Weight-based overlap statistics
-                print("By Weight:")
-                print(f"{'  Overlapped Weight':20}", end="")
-                for etf in etf_list:
-                    weight = stats_data[etf]['overlapped_weight']
-                    print(f"{weight:>11.1f}%", end="")
-                print()
-
-                print(f"{'  Overlap %':20}", end="")
-                for etf in etf_list:
-                    pct = stats_data[etf]['overlap_weight_pct']
-                    print(f"{pct:>11.1f}%", end="")
-                print()
-
-                print(f"{'  Unique Weight':20}", end="")
-                for etf in etf_list:
-                    weight = stats_data[etf]['unique_weight']
-                    print(f"{weight:>11.1f}%", end="")
-                print()
-
-                print(f"{'  Unique %':20}", end="")
-                for etf in etf_list:
-                    pct = stats_data[etf]['unique_weight_pct']
-                    print(f"{pct:>11.1f}%", end="")
-                print()
-                print()
-
-                # Find common holdings across all ETFs
-                all_asset_sets = [
-                    set(
-                        portfolio.df[portfolio.df["etf_symbol"] == etf][
-                            args.symbol_col
-                        ].unique()
-                    )
-                    for etf in etf_list
-                ]
-                common_all = set.intersection(*all_asset_sets)
-                print(
-                    f"Common Holdings (in all {len(etf_list)} ETFs): "
-                    f"{len(common_all)} assets"
-                )
-                if len(common_all) > 0:
-                    sample = sorted(list(common_all))[:10]
-                    print(f"  {', '.join(sample)}", end="")
-                    if len(common_all) > 10:
-                        print(f", ... ({len(common_all) - 10} more)")
-                    else:
-                        print()
-                print()
-
-                # Count assets by how many ETFs they appear in
-                from collections import Counter
-
-                asset_etf_count = Counter()
-                for etf in etf_list:
-                    etf_assets = portfolio.df[
-                        portfolio.df["etf_symbol"] == etf
-                    ][args.symbol_col].unique()
-                    for asset in etf_assets:
-                        asset_etf_count[asset] += 1
-
-                for count in range(len(etf_list) - 1, 0, -1):
-                    assets_in_n = [
-                        asset
-                        for asset, c in asset_etf_count.items()
-                        if c == count
-                    ]
-                    if len(assets_in_n) > 0:
-                        print(
-                            f"Assets in {count} ETF"
-                            f"{'s' if count > 1 else ''}: "
-                            f"{len(assets_in_n)} assets"
-                        )
-
-                print()
-
-                # Show unique assets for each ETF
-                for etf in etf_list:
-                    unique_count = stats_data[etf]["unique_count"]
-                    if unique_count > 0:
-                        print(f"Unique to {etf}: {unique_count} assets")
 
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)

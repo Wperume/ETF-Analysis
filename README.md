@@ -97,6 +97,15 @@ python etf_analyzer.py -d data -f overlap -o overlap_alpha.csv --sort-etfs alpha
 
 # Sort ETFs by asset weight in overlap output (this is the default)
 python etf_analyzer.py -d data -f overlap -o overlap_weight.csv --sort-etfs weight
+
+# Compare specific ETFs
+python etf_analyzer.py -d data -f compare --etfs IJJ,IWS,VBR
+
+# Compare ETFs and export to CSV (sorted by weight - default)
+python etf_analyzer.py -d data -f compare --etfs VTI,VOO,SPY -o comparison.csv
+
+# Compare ETFs with alphabetical sorting
+python etf_analyzer.py -d data -f compare --etfs VTI,VOO,SPY -o comparison_alpha.csv --sort-assets alpha
 ```
 
 **Command-Line Options:**
@@ -108,6 +117,7 @@ python etf_analyzer.py -d data -f overlap -o overlap_weight.csv --sort-etfs weig
   - `assets`: Show all assets with ETF associations (sorted by symbol)
   - `unique`: Show assets that appear in only one ETF (ETF_Count = 1)
   - `overlap`: Show assets that appear in multiple ETFs (ETF_Count > 1, sorted by count)
+  - `compare`: Compare specific ETFs side-by-side (requires `--etfs`)
   - `mapping`: Show asset-to-ETF mapping
   - `export`: Export DataFrame to file (requires `-o`)
 - `-o FILE` or `--output FILE`: Output file (if not specified, print to stdout)
@@ -115,7 +125,8 @@ python etf_analyzer.py -d data -f overlap -o overlap_weight.csv --sort-etfs weig
 - `--name-col COLUMN`: Column name for asset name (default: Name)
 - `--weight-col COLUMN`: Column name for weight/percentage (default: % Weight)
 - `--shares-col COLUMN`: Column name for shares (default: Shares)
-- `--sort-assets {weight,alpha}`: Sort assets by weight (default) or alphabetically (for summary function)
+- `--etfs ETF1,ETF2,...`: Comma-separated list of ETF symbols to compare (for compare function)
+- `--sort-assets {weight,alpha}`: Sort assets by weight (default) or alphabetically (for summary and compare functions)
 - `--sort-etfs {weight,alpha}`: Sort ETFs by asset weight (default) or alphabetically (for overlap function)
 - `--force`: Force overwrite of existing output files without prompting
 
@@ -128,8 +139,9 @@ python etf_analyzer.py -d data -f overlap -o overlap_weight.csv --sort-etfs weig
 
 **Sorting Options:**
 
-- **`--sort-assets {weight,alpha}`** (for `summary` function):
+- **`--sort-assets {weight,alpha}`** (for `summary` and `compare` functions):
   - `weight` (default): Sorts assets within each ETF by their percentage weight (descending), showing the largest holdings first
+    - For `compare`: Multi-column sort prioritizing the first ETF specified, then second, etc.
   - `alpha`: Sorts assets alphabetically by symbol
   - Example use case: Use `weight` to see which stocks have the highest allocation in each ETF, or use `alpha` for easier lookup
 
@@ -151,6 +163,7 @@ If you don't specify a file extension with `-o`, the appropriate extension will 
 | `mapping` | `.csv` | CSV with asset-to-ETF mapping |
 | `unique` | `.csv` | CSV with assets unique to one ETF |
 | `overlap` | `.csv` | CSV with assets in multiple ETFs |
+| `compare` | `.csv` | CSV with side-by-side ETF comparison |
 
 Examples:
 ```bash

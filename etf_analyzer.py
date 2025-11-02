@@ -1193,7 +1193,10 @@ Configuration File:
     parser.add_argument(
         "--etfs",
         metavar="ETF1,ETF2,...",
-        help="Comma-separated list of ETF symbols to compare (for compare function)",
+        help=(
+            "Comma-separated list of ETF symbols to compare "
+            "(for compare function)"
+        ),
     )
 
     # Force overwrite flag
@@ -1415,19 +1418,55 @@ Configuration File:
                             portfolio.df["etf_symbol"].isin(other_etfs)
                         ][args.symbol_col].unique()
                     )
-                    overlapped = etf_assets & other_assets
-                    overlap_count = len(overlapped)
-                    overlap_pct = (
+                    overlapped_assets = etf_assets & other_assets
+                    overlap_count = len(overlapped_assets)
+                    overlap_count_pct = (
                         (overlap_count / holdings_count * 100)
                         if holdings_count > 0
                         else 0
                     )
 
+                    # Calculate weight-based overlap
+                    total_weight = 0.0
+                    overlapped_weight = 0.0
+                    unique_weight = 0.0
+
+                    for _, row in etf_holdings.iterrows():
+                        asset = row[args.symbol_col]
+                        weight_str = row.get(args.weight_col, "0%")
+                        try:
+                            weight = float(
+                                str(weight_str).replace("%", "").strip()
+                            )
+                        except (ValueError, AttributeError):
+                            weight = 0.0
+
+                        total_weight += weight
+                        if asset in overlapped_assets:
+                            overlapped_weight += weight
+                        else:
+                            unique_weight += weight
+
+                    overlap_weight_pct = (
+                        (overlapped_weight / total_weight * 100)
+                        if total_weight > 0
+                        else 0
+                    )
+                    unique_weight_pct = (
+                        (unique_weight / total_weight * 100)
+                        if total_weight > 0
+                        else 0
+                    )
+
                     stats_data[etf] = {
                         "holdings": holdings_count,
-                        "overlapped": overlap_count,
-                        "overlap_pct": overlap_pct,
-                        "unique": holdings_count - overlap_count,
+                        "overlapped_count": overlap_count,
+                        "overlap_count_pct": overlap_count_pct,
+                        "unique_count": holdings_count - overlap_count,
+                        "overlapped_weight": overlapped_weight,
+                        "overlap_weight_pct": overlap_weight_pct,
+                        "unique_weight": unique_weight,
+                        "unique_weight_pct": unique_weight_pct,
                     }
 
                 # Print stats table
@@ -1440,20 +1479,59 @@ Configuration File:
                 for etf in etf_list:
                     print(f"{stats_data[etf]['holdings']:>12}", end="")
                 print()
-
-                print(f"{'Overlapped Assets':20}", end="")
-                for etf in etf_list:
-                    print(f"{stats_data[etf]['overlapped']:>12}", end="")
                 print()
 
-                print(f"{'Overlap %':20}", end="")
+                # Count-based overlap statistics
+                print("By Asset Count:")
+                print(f"{'  Overlapped Assets':20}", end="")
                 for etf in etf_list:
-                    print(f"{stats_data[etf]['overlap_pct']:>11.1f}%", end="")
+                    count = stats_data[etf]['overlapped_count']
+                    print(f"{count:>12}", end="")
                 print()
 
-                print(f"{'Unique Assets':20}", end="")
+                print(f"{'  Overlap %':20}", end="")
                 for etf in etf_list:
-                    print(f"{stats_data[etf]['unique']:>12}", end="")
+                    pct = stats_data[etf]['overlap_count_pct']
+                    print(f"{pct:>11.1f}%", end="")
+                print()
+
+                print(f"{'  Unique Assets':20}", end="")
+                for etf in etf_list:
+                    count = stats_data[etf]['unique_count']
+                    print(f"{count:>12}", end="")
+                print()
+
+                print(f"{'  Unique %':20}", end="")
+                for etf in etf_list:
+                    unique_pct = 100 - stats_data[etf]['overlap_count_pct']
+                    print(f"{unique_pct:>11.1f}%", end="")
+                print()
+                print()
+
+                # Weight-based overlap statistics
+                print("By Weight:")
+                print(f"{'  Overlapped Weight':20}", end="")
+                for etf in etf_list:
+                    weight = stats_data[etf]['overlapped_weight']
+                    print(f"{weight:>11.1f}%", end="")
+                print()
+
+                print(f"{'  Overlap %':20}", end="")
+                for etf in etf_list:
+                    pct = stats_data[etf]['overlap_weight_pct']
+                    print(f"{pct:>11.1f}%", end="")
+                print()
+
+                print(f"{'  Unique Weight':20}", end="")
+                for etf in etf_list:
+                    weight = stats_data[etf]['unique_weight']
+                    print(f"{weight:>11.1f}%", end="")
+                print()
+
+                print(f"{'  Unique %':20}", end="")
+                for etf in etf_list:
+                    pct = stats_data[etf]['unique_weight_pct']
+                    print(f"{pct:>11.1f}%", end="")
                 print()
                 print()
 
@@ -1508,7 +1586,7 @@ Configuration File:
 
                 # Show unique assets for each ETF
                 for etf in etf_list:
-                    unique_count = stats_data[etf]["unique"]
+                    unique_count = stats_data[etf]["unique_count"]
                     if unique_count > 0:
                         print(f"Unique to {etf}: {unique_count} assets")
 

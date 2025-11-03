@@ -629,6 +629,9 @@ class ETFPortfolioAnalyzer:
                             weight_val = float(
                                 str(weight_str).replace("%", "").strip()
                             )
+                            # Check for NaN and replace with 0.0
+                            if weight_val != weight_val:  # NaN check
+                                weight_val = 0.0
                         except (ValueError, AttributeError):
                             weight_val = 0.0
                     else:
@@ -875,13 +878,20 @@ class ETFPortfolioAnalyzer:
             for etf in etf_symbols:
                 # Create temporary numeric column for sorting
                 temp_col = f"_sort_{etf}"
-                result[temp_col] = result[etf].apply(
-                    lambda x: (
-                        float(str(x).replace("%", "").strip())
-                        if x != "N/A" and str(x).strip()
-                        else -999999.0
-                    )
-                )
+
+                def safe_weight_parse(x):
+                    if x != "N/A" and str(x).strip():
+                        try:
+                            val = float(str(x).replace("%", "").strip())
+                            # Check for NaN and replace with -999999.0
+                            if val != val:  # NaN check
+                                return -999999.0
+                            return val
+                        except (ValueError, AttributeError):
+                            return -999999.0
+                    return -999999.0
+
+                result[temp_col] = result[etf].apply(safe_weight_parse)
                 sort_cols.append(temp_col)
 
             # Sort by the temp columns (descending, with N/A at bottom)
@@ -1435,6 +1445,9 @@ Configuration File:
                         weight = float(
                             str(weight_str).replace("%", "").strip()
                         )
+                        # Check for NaN and replace with 0.0
+                        if weight != weight:  # NaN check
+                            weight = 0.0
                     except (ValueError, AttributeError):
                         weight = 0.0
 
@@ -1572,6 +1585,9 @@ Configuration File:
                                         .replace("%", "")
                                         .strip()
                                     )
+                                    # Check for NaN and replace with 0.0
+                                    if weight != weight:  # NaN check
+                                        weight = 0.0
                                 except (ValueError, AttributeError):
                                     weight = 0.0
                                 total_weight += weight

@@ -257,6 +257,44 @@ class TestETFPortfolioAnalyzer:
         for line in lines:
             assert line.strip() in ["SPY", "QQQ"]
 
+    def test_summary_function_csv_output(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test that summary function outputs correct CSV structure"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "summary.csv"
+
+        # Simulate CLI summary function behavior
+        summary = portfolio.get_etf_summary(
+            symbol_col="ticker", weight_col="weight"
+        )
+        summary.to_csv(output_file, index=True)
+
+        # Verify the CSV file was created
+        assert output_file.exists()
+
+        # Read back and verify structure
+        result = pd.read_csv(output_file)
+
+        # Should have ETF names in first column and summary stats
+        assert "etf_symbol" in result.columns
+        assert "holdings_count" in result.columns
+        assert "assets" in result.columns
+
+        # Verify data content
+        assert len(result) == 2  # SPY and QQQ
+
+        # Verify specific ETF data
+        spy_row = result[result["etf_symbol"] == "SPY"]
+        assert len(spy_row) == 1
+        assert spy_row.iloc[0]["holdings_count"] == 5
+
+        qqq_row = result[result["etf_symbol"] == "QQQ"]
+        assert len(qqq_row) == 1
+        assert qqq_row.iloc[0]["holdings_count"] == 3
+
     def test_get_etf_summary(
         self, temp_data_dir, spy_csv_file, qqq_csv_file
     ):
@@ -590,7 +628,8 @@ class TestETFPortfolioAnalyzer:
         assert list(result.columns) == expected_columns
 
         # Verify data content - should have all assets from both ETFs
-        assert len(result) == 8  # 5 from SPY + 3 from QQQ (no overlap in test data)
+        # 5 from SPY + 3 from QQQ (no overlap in test data)
+        assert len(result) == 8
 
         # Check that weights are present for assets in their respective ETFs
         # and NaN for assets not in an ETF

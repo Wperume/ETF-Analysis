@@ -50,7 +50,7 @@ class ETFAnalyzer:
 
         # Generate synthetic symbols for empty or invalid Symbol values
         # Treat empty strings, NaN, and ":" as missing symbols
-        # Format: ETF_SYMBOL + No. (e.g., CANE1, CANE2)
+        # Format: ETF_SYMBOL-No. (e.g., CORN-1, CORN-2)
         if symbol_col in df.columns and no_col in df.columns:
             # Convert Symbol column to string dtype to avoid dtype warning
             df[symbol_col] = df[symbol_col].astype(str)
@@ -60,7 +60,7 @@ class ETFAnalyzer:
                 | (df[symbol_col] == ":")
             )
             df.loc[empty_mask, symbol_col] = (
-                self.etf_name + df.loc[empty_mask, no_col].astype(str)
+                self.etf_name + "-" + df.loc[empty_mask, no_col].astype(str)
             )
 
         df.insert(0, "etf_symbol", self.etf_name)
@@ -1361,7 +1361,11 @@ Configuration File:
                     & (portfolio.df["etf_symbol"] == etf)
                 ]
 
-                if not asset_data.empty and args.weight_col in portfolio.df.columns:
+                has_weight = (
+                    not asset_data.empty
+                    and args.weight_col in portfolio.df.columns
+                )
+                if has_weight:
                     weight = asset_data.iloc[0].get(args.weight_col, "N/A")
                 else:
                     weight = "N/A"

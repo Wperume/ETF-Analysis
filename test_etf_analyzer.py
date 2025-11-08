@@ -226,6 +226,37 @@ class TestETFPortfolioAnalyzer:
         assert "SPY" in etf_list
         assert "QQQ" in etf_list
 
+    def test_list_function_output(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test that list function outputs ETF symbols correctly to file"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "etf_list.txt"
+
+        # Simulate CLI list function behavior
+        etf_list = portfolio.get_etf_list()
+        with open(output_file, "w") as f:
+            for etf in etf_list:
+                f.write(f"{etf}\n")
+
+        # Verify the file was created
+        assert output_file.exists()
+
+        # Read back and verify content
+        with open(output_file, "r") as f:
+            lines = f.read().strip().split("\n")
+
+        # Should have 2 lines (SPY and QQQ)
+        assert len(lines) == 2
+        assert "SPY" in lines
+        assert "QQQ" in lines
+
+        # Each line should be a single ETF symbol
+        for line in lines:
+            assert line.strip() in ["SPY", "QQQ"]
+
     def test_get_etf_summary(
         self, temp_data_dir, spy_csv_file, qqq_csv_file
     ):
@@ -384,6 +415,52 @@ class TestETFPortfolioAnalyzer:
         with pytest.raises(ValueError, match="not found in data"):
             portfolio.get_asset_to_etf_mapping(symbol_col="invalid")
 
+    def test_export_mapping_csv_structure(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test that mapping CSV export includes Name and ETF_Count columns"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "mapping.csv"
+
+        # Simulate CLI mapping export behavior
+        mapping = portfolio.get_asset_to_etf_mapping(symbol_col="ticker")
+        rows = []
+        for symbol, etfs in sorted(mapping.items()):
+            asset_data = portfolio.df[
+                portfolio.df["ticker"] == symbol
+            ].iloc[0]
+            name = asset_data.get("name", "N/A")
+
+            rows.append(
+                {
+                    "Symbol": symbol,
+                    "Name": name,
+                    "ETF_Count": len(etfs),
+                    "ETFs": ", ".join(etfs),
+                }
+            )
+        df = pd.DataFrame(rows)
+        df.to_csv(output_file, index=False)
+
+        # Verify the CSV file was created
+        assert output_file.exists()
+
+        # Read back and verify structure
+        result = pd.read_csv(output_file)
+        assert "Symbol" in result.columns
+        assert "Name" in result.columns
+        assert "ETF_Count" in result.columns
+        assert "ETFs" in result.columns
+
+        # Verify data content
+        aapl_row = result[result["Symbol"] == "AAPL"]
+        assert len(aapl_row) == 1
+        assert aapl_row.iloc[0]["Name"] == "Apple Inc."
+        assert aapl_row.iloc[0]["ETF_Count"] == 1
+        assert "SPY" in aapl_row.iloc[0]["ETFs"]
+
     def test_get_assets_by_etf_count(
         self, temp_data_dir, spy_csv_file, qqq_csv_file
     ):
@@ -478,6 +555,170 @@ class TestETFPortfolioAnalyzer:
         # Should have exactly 3 valid symbols
         assert len(unique) == 3
 
+    def test_compare_function_csv_output(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test that compare function outputs correct CSV structure"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "compare.csv"
+
+        # Simulate CLI compare function behavior
+        etf_list = ["SPY", "QQQ"]
+        comparison = portfolio.get_etf_comparison(
+            etf_symbols=etf_list,
+            symbol_col="ticker",
+            weight_col="weight",
+            sort_by="weight",
+        )
+        comparison.to_csv(output_file, index=False)
+
+        # Verify the CSV file was created
+        assert output_file.exists()
+
+        # Read back and verify structure
+        result = pd.read_csv(output_file)
+
+        # Should have ticker column (symbol_col) plus one column per ETF
+        assert "ticker" in result.columns
+        assert "SPY" in result.columns
+        assert "QQQ" in result.columns
+
+        # Verify column order (ticker first, then ETFs)
+        expected_columns = ["ticker", "SPY", "QQQ"]
+        assert list(result.columns) == expected_columns
+
+        # Verify data content - should have all assets from both ETFs
+        assert len(result) == 8  # 5 from SPY + 3 from QQQ (no overlap in test data)
+
+        # Check that weights are present for assets in their respective ETFs
+        # and NaN for assets not in an ETF
+        for _, row in result.iterrows():
+            spy_weight = row["SPY"]
+            qqq_weight = row["QQQ"]
+
+            # At least one should have a value (not both NaN)
+            assert not (pd.isna(spy_weight) and pd.isna(qqq_weight))
+
+        # Verify AAPL is in SPY but not QQQ
+        aapl_row = result[result["ticker"] == "AAPL"]
+        assert len(aapl_row) == 1
+        assert not pd.isna(aapl_row.iloc[0]["SPY"])
+        assert pd.isna(aapl_row.iloc[0]["QQQ"])
+
+        # Verify NVDA is in QQQ but not SPY
+        nvda_row = result[result["ticker"] == "NVDA"]
+        assert len(nvda_row) == 1
+        assert pd.isna(nvda_row.iloc[0]["SPY"])
+        assert not pd.isna(nvda_row.iloc[0]["QQQ"])
+
+    def test_overlap_function_csv_output(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test that overlap function outputs correct CSV structure"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "overlap.csv"
+
+        # Simulate CLI overlap function behavior
+        assets = portfolio.get_assets_with_etf_list(
+            symbol_col="ticker", name_col="name"
+        )
+        overlap_assets = assets[assets["ETF_Count"] > 1]
+        # Sort by ETF_Count descending, then by Symbol ascending
+        overlap_assets = overlap_assets.sort_values(
+            ["ETF_Count", "Symbol"], ascending=[False, True]
+        )
+        overlap_assets = overlap_assets.reset_index(drop=True)
+        overlap_assets.to_csv(output_file, index=False)
+
+        # Verify the CSV file was created
+        assert output_file.exists()
+
+        # Read back and verify structure
+        result = pd.read_csv(output_file)
+        assert "Symbol" in result.columns
+        assert "Name" in result.columns
+        assert "ETF_Count" in result.columns
+        assert "ETFs" in result.columns
+
+        # Verify column order
+        assert list(result.columns) == ["Symbol", "Name", "ETF_Count", "ETFs"]
+
+        # All assets should have ETF_Count > 1
+        assert all(result["ETF_Count"] > 1)
+
+        # Verify sorted by ETF_Count descending, then Symbol ascending
+        # Check ETF_Count is monotonically non-increasing
+        assert all(
+            result["ETF_Count"].iloc[i] >= result["ETF_Count"].iloc[i + 1]
+            for i in range(len(result) - 1)
+        )
+
+        # For assets with same ETF_Count, verify Symbol is sorted
+        for count in result["ETF_Count"].unique():
+            subset = result[result["ETF_Count"] == count]
+            assert list(subset["Symbol"]) == sorted(subset["Symbol"].tolist())
+
+    def test_unique_function_output_structure(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test that unique function output has correct structure"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "unique.csv"
+
+        # Simulate CLI unique function behavior
+        assets = portfolio.get_assets_with_etf_list(
+            symbol_col="ticker", name_col="name"
+        )
+        unique_assets = assets[assets["ETF_Count"] == 1].copy()
+
+        # Add Weight column
+        weights = []
+        for _, row in unique_assets.iterrows():
+            symbol = row["Symbol"]
+            etf = row["ETFs"]
+
+            asset_data = portfolio.df[
+                (portfolio.df["ticker"] == symbol)
+                & (portfolio.df["etf_symbol"] == etf)
+            ]
+
+            if not asset_data.empty and "weight" in portfolio.df.columns:
+                weight = asset_data.iloc[0].get("weight", "N/A")
+            else:
+                weight = "N/A"
+
+            weights.append(weight)
+
+        unique_assets["Weight"] = weights
+        unique_assets = unique_assets[["Symbol", "Name", "Weight", "ETFs"]]
+        unique_assets.to_csv(output_file, index=False)
+
+        # Verify the CSV file was created
+        assert output_file.exists()
+
+        # Read back and verify structure
+        result = pd.read_csv(output_file)
+        assert "Symbol" in result.columns
+        assert "Name" in result.columns
+        assert "Weight" in result.columns
+        assert "ETFs" in result.columns
+        # ETF_Count should NOT be in the output
+        assert "ETF_Count" not in result.columns
+
+        # Verify column order
+        assert list(result.columns) == ["Symbol", "Name", "Weight", "ETFs"]
+
+        # All assets should have only one ETF (unique)
+        for etf_list in result["ETFs"]:
+            # ETF list should not contain commas (only one ETF)
+            assert "," not in str(etf_list)
+
     def test_get_assets_with_etf_list(
         self, temp_data_dir, spy_csv_file, qqq_csv_file
     ):
@@ -505,6 +746,47 @@ class TestETFPortfolioAnalyzer:
         assert len(result) == 8  # 5 from SPY + 3 from QQQ
         assert "AAPL" in result["Symbol"].values
         assert "NVDA" in result["Symbol"].values
+
+    def test_assets_function_csv_output(
+        self, temp_data_dir, spy_csv_file, qqq_csv_file
+    ):
+        """Test that assets function outputs correct CSV structure"""
+        portfolio = ETFPortfolioAnalyzer(str(temp_data_dir))
+        portfolio.load_all_etfs()
+
+        output_file = temp_data_dir / "assets.csv"
+
+        # Simulate CLI assets function behavior
+        assets = portfolio.get_assets_with_etf_list(
+            symbol_col="ticker", name_col="name"
+        )
+        assets.to_csv(output_file, index=False)
+
+        # Verify the CSV file was created
+        assert output_file.exists()
+
+        # Read back and verify structure
+        result = pd.read_csv(output_file)
+        assert "Symbol" in result.columns
+        assert "Name" in result.columns
+        assert "ETF_Count" in result.columns
+        assert "ETFs" in result.columns
+
+        # Verify column order
+        assert list(result.columns) == ["Symbol", "Name", "ETF_Count", "ETFs"]
+
+        # Verify data content
+        assert len(result) == 8  # 5 from SPY + 3 from QQQ
+
+        # Verify sorted by Symbol
+        assert list(result["Symbol"]) == sorted(result["Symbol"].tolist())
+
+        # Verify specific assets
+        aapl_row = result[result["Symbol"] == "AAPL"]
+        assert len(aapl_row) == 1
+        assert aapl_row.iloc[0]["Name"] == "Apple Inc."
+        assert aapl_row.iloc[0]["ETF_Count"] == 1
+        assert "SPY" in aapl_row.iloc[0]["ETFs"]
 
     def test_export_asset_analysis_by_symbol(
         self, temp_data_dir, spy_csv_file, qqq_csv_file

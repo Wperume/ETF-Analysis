@@ -1317,8 +1317,19 @@ Configuration File:
                 # Export mapping as CSV with proper formatting
                 rows = []
                 for symbol, etfs in sorted(mapping.items()):
+                    # Get the asset name (use first occurrence)
+                    asset_data = portfolio.df[
+                        portfolio.df[args.symbol_col] == symbol
+                    ].iloc[0]
+                    name = asset_data.get(args.name_col, "N/A")
+
                     rows.append(
-                        {"Symbol": symbol, "ETFs": ", ".join(etfs)}
+                        {
+                            "Symbol": symbol,
+                            "Name": name,
+                            "ETF_Count": len(etfs),
+                            "ETFs": ", ".join(etfs),
+                        }
                     )
                 df = pd.DataFrame(rows)
                 df.to_csv(args.output, index=False)
@@ -1336,12 +1347,37 @@ Configuration File:
             assets = portfolio.get_assets_with_etf_list(
                 symbol_col=args.symbol_col, name_col=args.name_col
             )
-            unique_assets = assets[assets["ETF_Count"] == 1]
+            unique_assets = assets[assets["ETF_Count"] == 1].copy()
+
+            # Add Weight column for each unique asset
+            weights = []
+            for _, row in unique_assets.iterrows():
+                symbol = row["Symbol"]
+                etf = row["ETFs"]  # Only one ETF since it's unique
+
+                # Get weight for this asset from its ETF
+                asset_data = portfolio.df[
+                    (portfolio.df[args.symbol_col] == symbol)
+                    & (portfolio.df["etf_symbol"] == etf)
+                ]
+
+                if not asset_data.empty and args.weight_col in portfolio.df.columns:
+                    weight = asset_data.iloc[0].get(args.weight_col, "N/A")
+                else:
+                    weight = "N/A"
+
+                weights.append(weight)
+
+            unique_assets["Weight"] = weights
+
+            # Remove ETF_Count column and reorder: Symbol, Name, Weight, ETFs
+            unique_assets = unique_assets[["Symbol", "Name", "Weight", "ETFs"]]
+
             if args.output:
                 unique_assets.to_csv(args.output, index=False)
                 print(f"Unique assets exported to: {args.output}")
             else:
-                print("Assets Unique to One ETF (ETF_Count = 1)")
+                print("Assets Unique to One ETF")
                 print("=" * 60)
                 print(unique_assets.to_string())
                 print()

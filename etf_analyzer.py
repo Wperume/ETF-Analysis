@@ -207,6 +207,9 @@ class ETFPortfolioAnalyzer:
         """
         Load all ETF CSV files from the directory into a single DataFrame
 
+        Uses parallel loading with ThreadPoolExecutor for improved performance
+        when loading multiple ETF files.
+
         Args:
             pattern: Glob pattern for ETF files (default: *-etf-holdings.csv)
             **kwargs: Additional arguments to pass to pd.read_csv()
@@ -214,6 +217,8 @@ class ETFPortfolioAnalyzer:
         Returns:
             Combined DataFrame with all ETF holdings
         """
+        from concurrent.futures import ThreadPoolExecutor
+
         csv_files = list(self.data_dir.glob(pattern))
 
         if not csv_files:
@@ -221,10 +226,24 @@ class ETFPortfolioAnalyzer:
                 f"No files matching '{pattern}' found in {self.data_dir}"
             )
 
-        all_dfs = []
-        for csv_file in sorted(csv_files):
+        def load_single_etf(csv_file):
+            """Load a single ETF file and return analyzer and dataframe"""
             analyzer = ETFAnalyzer(str(csv_file))
             df = analyzer.load_data(**kwargs)
+            return analyzer, df
+
+        # Use ThreadPoolExecutor for parallel loading
+        # Limit workers to avoid overwhelming the system
+        max_workers = min(10, len(csv_files))
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Sort files for consistent ordering
+            sorted_files = sorted(csv_files)
+            results = list(executor.map(load_single_etf, sorted_files))
+
+        # Separate analyzers and dataframes
+        all_dfs = []
+        for analyzer, df in results:
             all_dfs.append(df)
             self.etf_analyzers[analyzer.etf_name] = analyzer
 
